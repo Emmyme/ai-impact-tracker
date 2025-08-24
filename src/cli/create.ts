@@ -140,19 +140,59 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     await fs.ensureDir(path.join(projectPath, dir));
   }
 
-  // Find templates directory relative to the CLI tool's location
-  let templateDir = path.join(process.cwd(), 'templates');
+  // Find templates directory - try multiple possible locations
+  let templateDir = '';
   
-  // If templates not found in current directory, try relative to CLI location
-  if (!await fs.pathExists(templateDir)) {
-    const cliDir = path.dirname(new URL(import.meta.url).pathname);
-    const altTemplateDir = path.join(cliDir, '..', '..', 'templates');
-    if (await fs.pathExists(altTemplateDir)) {
-      templateDir = altTemplateDir;
+  console.log(`Current working directory: ${process.cwd()}`);
+  
+  // Try current working directory first
+  const cwdTemplates = path.join(process.cwd(), 'templates');
+  console.log(`Checking CWD templates: ${cwdTemplates}`);
+  if (await fs.pathExists(cwdTemplates)) {
+    templateDir = cwdTemplates;
+    console.log(`Found templates in CWD: ${templateDir}`);
+  } else {
+    console.log(`Templates not found in CWD`);
+    
+    // Try relative to the CLI tool's location
+    const currentFileUrl = new URL(import.meta.url);
+    const currentFilePath = currentFileUrl.pathname;
+    const cliDir = path.dirname(currentFilePath);
+    console.log(`CLI directory: ${cliDir}`);
+    
+    // Convert Unix-style path to Windows path if needed
+    let normalizedCliDir = cliDir;
+    if (cliDir.startsWith('/')) {
+      normalizedCliDir = cliDir.substring(1).replace(/\//g, '\\');
+    }
+    console.log(`Normalized CLI directory: ${normalizedCliDir}`);
+    
+    // Try different relative paths
+    const possiblePaths = [
+      path.join(normalizedCliDir, '..', 'templates'), // For global install: dist/../templates
+      path.join(normalizedCliDir, '..', '..', 'templates'), // For local development: dist/cli/../../templates
+      path.join(normalizedCliDir, '..', '..', '..', 'templates'), // For local development: dist/cli/../../../templates
+      path.join(normalizedCliDir, 'templates'),
+      path.join(process.cwd(), '..', 'templates'),
+      path.join(process.cwd(), '..', '..', 'templates')
+    ];
+    
+    console.log('Checking possible paths:');
+    for (const possiblePath of possiblePaths) {
+      console.log(`  ${possiblePath} - exists: ${await fs.pathExists(possiblePath)}`);
+      if (await fs.pathExists(possiblePath)) {
+        templateDir = possiblePath;
+        console.log(`Found templates at: ${templateDir}`);
+        break;
+      }
     }
   }
   
-  console.log(`Template directory: ${templateDir}`);
+  if (!templateDir) {
+    throw new Error('Could not find templates directory. Please ensure the CLI tool is properly installed.');
+  }
+  
+  console.log(`Final template directory: ${templateDir}`);
   console.log(`Template directory exists: ${await fs.pathExists(templateDir)}`);
 
   const backendTemplates = [
