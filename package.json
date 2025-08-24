@@ -1,0 +1,64 @@
+{
+  "name": "ai-sustainability-dashboard",
+  "version": "1.0.0",
+  "description": "Open-source AI sustainability dashboard for tracking environmental impact of AI workloads",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "ai-impact-tracker": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "create": "node dist/cli.js create",
+    "setup": "node dist/cli.js setup"
+  },
+  "keywords": [
+    "ai",
+    "sustainability",
+    "dashboard",
+    "carbon-tracking",
+    "energy-monitoring",
+    "environmental-impact"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+
+    "fs-extra": "^11.2.0",
+    "axios": "^1.6.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "sqlite3": "^5.1.6",
+    "sequelize": "^6.35.1",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.7",
+    "@types/sqlite3": "^3.1.11",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.8",
+    "prettier": "^3.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

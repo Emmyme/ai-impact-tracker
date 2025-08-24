@@ -1,0 +1,35 @@
+# AI Sustainability Dashboard Backend
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+email-validator==2.1.0
+
+# AI Sustainability Tracking
+codecarbon==2.3.4
+carbontracker==1.2.6
+psutil==5.9.6
+GPUtil==1.4.0
+
+# Utilities
+requests==2.31.0
+python-multipart==0.0.6
+cors==1.0.1
+loguru==0.7.2
+
+# Development
+pytest==7.4.3
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1

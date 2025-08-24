@@ -1,0 +1,29 @@
+# Core FastAPI dependencies
+fastapi
+uvicorn
+pydantic
+python-dotenv
+
+# Database
+sqlalchemy
+alembic
+
+# AI Sustainability Tracking
+codecarbon
+carbontracker
+psutil
+GPUtil
+
+# Utilities
+requests
+python-multipart
+loguru
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Development
+pytest
+black
+flake8
