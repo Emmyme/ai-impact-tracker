@@ -252,6 +252,10 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     { src: 'backend_env_example', dest: '.env.example' }
   ];
 
+  const otherTemplates = [
+    { src: 'LICENSE', dest: 'LICENSE' }
+  ];
+
   const dockerTemplates = [
     { src: 'docker_compose_yml', dest: 'docker-compose.yml' },
     { src: 'docker_backend_dockerfile', dest: 'docker/backend.Dockerfile' },
@@ -279,6 +283,16 @@ async function createProjectStructure(projectPath: string, config: any): Promise
 
   // Copy Docker files
   for (const template of dockerTemplates) {
+    const srcPath = path.join(templateDir, template.src);
+    const destPath = path.join(projectPath, template.dest);
+    
+    if (await fs.pathExists(srcPath)) {
+      await fs.copy(srcPath, destPath);
+    }
+  }
+
+  // Copy other files
+  for (const template of otherTemplates) {
     const srcPath = path.join(templateDir, template.src);
     const destPath = path.join(projectPath, template.dest);
     

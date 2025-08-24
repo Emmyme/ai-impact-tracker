@@ -1,5 +1,5 @@
 {
-  "name": "ai-sustainability-dashboard",
+  "name": "ai-impact-tracker",
   "version": "1.0.0",
   "description": "Open-source AI sustainability dashboard for tracking environmental impact of AI workloads",
   "type": "module",
@@ -25,7 +25,7 @@
     "energy-monitoring",
     "environmental-impact"
   ],
-  "author": "Your Name",
+  "author": "Emelie Berg",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",

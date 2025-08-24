@@ -2,6 +2,8 @@
 
 An open-source dashboard designed to help companies measure, track, and reduce the environmental impact of their AI workloads. This tool provides visibility into AI training and inference energy usage, CO₂ emissions, and water footprint, enabling teams to make data-driven sustainability decisions.
 
+**Disclaimer**: This tool is provided for educational and overview purposes only. The sustainability metrics and calculations are estimates and should not be used for official compliance reporting, legal purposes, or financial decisions. For accurate environmental impact assessments, please consult with qualified environmental consultants or use certified measurement tools.
+
 ## 🌱 Why This Matters
 
 AI workloads consume significant energy, water, and produce carbon emissions. Smaller companies often lack tools to monitor and optimize their AI's environmental impact. This dashboard provides a simple, open-source solution to encourage sustainable AI practices without adding additional AI overhead.
@@ -271,7 +273,7 @@ npm run dev
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [CodeCarbon](https://github.com/mlco2/codecarbon) - Carbon tracking library
 - [CarbonTracker](https://github.com/lfwa/carbontracker) - Energy monitoring
