@@ -80,7 +80,6 @@ The setup creates default users for testing:
 
 - **Admin**: `admin` / `admin123`
 - **Developer**: `developer` / `dev123`
-- **Manager**: `manager` / `manager123`
 
 ### Track Your AI Workloads
 

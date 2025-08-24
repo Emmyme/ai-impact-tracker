@@ -140,7 +140,20 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     await fs.ensureDir(path.join(projectPath, dir));
   }
 
-  const templateDir = path.join(process.cwd(), 'templates');
+  // Find templates directory relative to the CLI tool's location
+  let templateDir = path.join(process.cwd(), 'templates');
+  
+  // If templates not found in current directory, try relative to CLI location
+  if (!await fs.pathExists(templateDir)) {
+    const cliDir = path.dirname(new URL(import.meta.url).pathname);
+    const altTemplateDir = path.join(cliDir, '..', '..', 'templates');
+    if (await fs.pathExists(altTemplateDir)) {
+      templateDir = altTemplateDir;
+    }
+  }
+  
+  console.log(`Template directory: ${templateDir}`);
+  console.log(`Template directory exists: ${await fs.pathExists(templateDir)}`);
 
   const backendTemplates = [
     { src: 'backend_main.py', dest: 'backend/main.py' },
