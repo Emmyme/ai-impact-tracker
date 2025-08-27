@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
 Initialize the database with default users.
-Run this script to create the database tables and add default users.
+
 """
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.database.database import engine, get_db, Base
+from core.database.database import engine
+from core.database import get_db, Base
 from core.security import get_password_hash
 from core.database.models import User
-from sqlalchemy.orm import Session
 
 def create_default_users():
-    """Create default users in the database."""
+    # Create default users.
     # Create all tables first
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
@@ -32,27 +32,27 @@ def create_default_users():
         {
             "username": "admin",
             "email": "admin@example.com",
-            "full_name": "System Administrator",
+            "full_name": "Admin",
             "role": "admin",
-            "hashed_password": get_password_hash("admin123"),
+            "hashed_password": get_password_hash(os.environ.get("DASHBOARD_PASSWORD", "admin123")),
             "is_active": True,
             "needs_password_setup": False
         },
         {
             "username": "developer",
             "email": "developer@example.com",
-            "full_name": "AI Developer",
+            "full_name": "Developer",
             "role": "developer",
-            "hashed_password": get_password_hash("dev123"),
+            "hashed_password": get_password_hash(os.environ.get("DASHBOARD_PASSWORD", "dev123")),
             "is_active": True,
             "needs_password_setup": False
         },
         {
             "username": "manager",
             "email": "manager@example.com",
-            "full_name": "Project Manager",
+            "full_name": "Manager",
             "role": "manager",
-            "hashed_password": get_password_hash("manager123"),
+            "hashed_password": get_password_hash(os.environ.get("DASHBOARD_PASSWORD", "manager123")),
             "is_active": True,
             "needs_password_setup": False
         }
@@ -64,9 +64,13 @@ def create_default_users():
     
     db.commit()
     print("Default users created successfully!")
-    print("Admin: admin / admin123")
-    print("Developer: developer / dev123")
-    print("Manager: manager / manager123")
+    if os.environ.get("DASHBOARD_PASSWORD"):
+        print("All users created with your custom password from DASHBOARD_PASSWORD")
+    else:
+        print("Default passwords used (set DASHBOARD_PASSWORD for custom passwords):")
+        print("Admin: admin / admin123")
+        print("Developer: developer / dev123")
+        print("Manager: manager / manager123")
 
 if __name__ == "__main__":
     create_default_users()

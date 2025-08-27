@@ -1,116 +1,86 @@
 import fs from 'fs-extra';
 import path from 'path';
 import inquirer from 'inquirer';
-
-interface SetupOptions {
-  config?: string;
-  database?: string;
-  port?: string;
-}
-
-export async function setupDashboard(options: SetupOptions): Promise<void> {
-  console.log('Setting up AI Sustainability Dashboard for existing project...');
-  
-  try {
-    const currentDir = process.cwd();
-    
-    // Get setup configuration
-    const config = await getSetupConfig(options);
-    
-    // Create necessary directories
-    await createDirectories(currentDir);
-    
-    // Copy backend files
-    await copyBackendFiles(currentDir);
-    
-    // Copy frontend files
-    await copyFrontendFiles(currentDir);
-    
-    // Create configuration files
-    await createConfigFiles(currentDir, config);
-    
-    // Install dependencies
-    console.log('Installing dependencies...');
-    await installDependencies(currentDir);
-    
-    console.log('Dashboard setup completed successfully!');
-    
-    // Show next steps
-    showSetupNextSteps(config);
-    
-  } catch (error) {
-    console.error('Failed to setup dashboard');
-    throw error;
-  }
-}
-
-async function getSetupConfig(options: SetupOptions) {
-  const answers = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'database',
-      message: 'Choose database:',
-      choices: [
-        { name: 'SQLite (recommended for development)', value: 'sqlite' },
-        { name: 'PostgreSQL', value: 'postgres' },
-        { name: 'MySQL', value: 'mysql' }
-      ],
-      default: 'sqlite'
-    },
-    {
-      type: 'number',
-      name: 'port',
-      message: 'Dashboard port:',
-      default: 3000
-    },
-    {
-      type: 'input',
-      name: 'secretKey',
-      message: 'Secret key for JWT authentication (or press Enter for auto-generated):',
-      default: ''
+export async function setupDashboard(options) {
+    console.log('Setting up AI Sustainability Dashboard for existing project...');
+    try {
+        const currentDir = process.cwd();
+        const config = await getSetupConfig(options);
+        await createDirectories(currentDir);
+        await copyBackendFiles(currentDir);
+        await copyFrontendFiles(currentDir);
+        await createConfigFiles(currentDir, config);
+        console.log('Installing dependencies...');
+        await installDependencies(currentDir);
+        console.log('Dashboard setup completed successfully!');
+        showSetupNextSteps(config);
     }
-  ]);
-
-  return {
-    database: answers.database,
-    port: answers.port,
-    secretKey: answers.secretKey || generateSecretKey()
-  };
+    catch (error) {
+        console.error('Failed to setup dashboard');
+        throw error;
+    }
 }
-
-function generateSecretKey(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+async function getSetupConfig(options) {
+    const answers = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'database',
+            message: 'Choose database:',
+            choices: [
+                { name: 'SQLite (recommended for development)', value: 'sqlite' },
+                { name: 'PostgreSQL', value: 'postgres' },
+                { name: 'MySQL', value: 'mysql' }
+            ],
+            default: 'sqlite'
+        },
+        {
+            type: 'number',
+            name: 'port',
+            message: 'Dashboard port:',
+            default: 3000
+        },
+        {
+            type: 'input',
+            name: 'secretKey',
+            message: 'Secret key for JWT authentication (or press Enter for auto-generated):',
+            default: ''
+        }
+    ]);
+    return {
+        database: answers.database,
+        port: answers.port,
+        secretKey: answers.secretKey || generateSecretKey()
+    };
 }
-
-async function createDirectories(currentDir: string): Promise<void> {
-  const dirs = [
-    'backend',
-    'backend/api',
-    'backend/api/routes',
-    'backend/api/models',
-    'backend/api/schemas',
-    'backend/core',
-    'backend/core/database',
-    'backend/data',
-    'frontend',
-    'frontend/src',
-    'frontend/src/app',
-    'frontend/src/components',
-    'frontend/src/components/ui',
-    'frontend/src/components/auth',
-    'frontend/src/contexts',
-    'frontend/src/lib',
-    'data'
-  ];
-
-  for (const dir of dirs) {
-    await fs.ensureDir(path.join(currentDir, dir));
-  }
+function generateSecretKey() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
-
-async function copyBackendFiles(currentDir: string): Promise<void> {
-  // Create backend requirements.txt
-  const requirementsContent = `# AI Sustainability Dashboard Backend
+async function createDirectories(currentDir) {
+    const dirs = [
+        'backend',
+        'backend/api',
+        'backend/api/routes',
+        'backend/api/models',
+        'backend/api/schemas',
+        'backend/core',
+        'backend/core/database',
+        'backend/data',
+        'frontend',
+        'frontend/src',
+        'frontend/src/app',
+        'frontend/src/components',
+        'frontend/src/components/ui',
+        'frontend/src/components/auth',
+        'frontend/src/contexts',
+        'frontend/src/lib',
+        'data'
+    ];
+    for (const dir of dirs) {
+        await fs.ensureDir(path.join(currentDir, dir));
+    }
+}
+async function copyBackendFiles(currentDir) {
+    const requirementsContent = `# AI Sustainability Dashboard Backend
 # Core dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
@@ -145,10 +115,8 @@ black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
 `;
-  await fs.writeFile(path.join(currentDir, 'requirements.txt'), requirementsContent);
-
-  // Create backend main.py
-  const mainPyContent = `from fastapi import FastAPI
+    await fs.writeFile(path.join(currentDir, 'requirements.txt'), requirementsContent);
+    const mainPyContent = `from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import auth, metrics
 
@@ -175,10 +143,8 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 `;
-  await fs.writeFile(path.join(currentDir, 'backend/main.py'), mainPyContent);
-
-  // Create backend config
-  const configPyContent = `import os
+    await fs.writeFile(path.join(currentDir, 'backend/main.py'), mainPyContent);
+    const configPyContent = `import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 
@@ -221,10 +187,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 `;
-  await fs.writeFile(path.join(currentDir, 'backend/core/config.py'), configPyContent);
-
-  // Create database setup
-  const databasePyContent = `from sqlalchemy import create_engine
+    await fs.writeFile(path.join(currentDir, 'backend/core/config.py'), configPyContent);
+    const databasePyContent = `from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
@@ -249,10 +213,8 @@ def get_db():
     finally:
         db.close()
 `;
-  await fs.writeFile(path.join(currentDir, 'backend/core/database/database.py'), databasePyContent);
-
-  // Create init_users.py
-  const initUsersContent = `#!/usr/bin/env python3
+    await fs.writeFile(path.join(currentDir, 'backend/core/database/database.py'), databasePyContent);
+    const initUsersContent = `#!/usr/bin/env python3
 """
 Initialize the database with default users.
 Run this script to create the database tables and add default users.
@@ -316,52 +278,48 @@ def create_default_users():
 if __name__ == "__main__":
     create_default_users()
 `;
-  await fs.writeFile(path.join(currentDir, 'backend/init_users.py'), initUsersContent);
+    await fs.writeFile(path.join(currentDir, 'backend/init_users.py'), initUsersContent);
 }
-
-async function copyFrontendFiles(currentDir: string): Promise<void> {
-  // Create frontend package.json
-  const frontendPackageJson = {
-    name: "ai-sustainability-dashboard-frontend",
-    version: '1.0.0',
-    private: true,
-    scripts: {
-      dev: 'next dev',
-      build: 'next build',
-      start: 'next start',
-      lint: 'next lint'
-    },
-    dependencies: {
-      next: '14.0.4',
-      react: '18.2.0',
-      'react-dom': '18.2.0',
-      '@types/node': '20.10.5',
-      '@types/react': '18.2.45',
-      '@types/react-dom': '18.2.18',
-      typescript: '5.3.3',
-      'tailwindcss': '3.3.6',
-      'autoprefixer': '10.4.16',
-      'postcss': '8.4.32',
-      '@radix-ui/react-slot': '1.0.2',
-      '@radix-ui/react-select': '2.0.0',
-      '@radix-ui/react-dialog': '1.0.5',
-      'class-variance-authority': '0.7.0',
-      'clsx': '2.0.0',
-      'tailwind-merge': '2.2.0',
-      'lucide-react': '0.303.0',
-      'next-themes': '0.2.1',
-      'd3': '7.8.5',
-      '@types/d3': '7.4.3'
-    },
-    devDependencies: {
-      eslint: '8.56.0',
-      'eslint-config-next': '14.0.4'
-    }
-  };
-  await fs.writeJson(path.join(currentDir, 'frontend/package.json'), frontendPackageJson, { spaces: 2 });
-
-  // Create frontend configuration files
-  const nextConfigContent = `/** @type {import('next').NextConfig} */
+async function copyFrontendFiles(currentDir) {
+    const frontendPackageJson = {
+        name: "ai-sustainability-dashboard-frontend",
+        version: '1.0.0',
+        private: true,
+        scripts: {
+            dev: 'next dev',
+            build: 'next build',
+            start: 'next start',
+            lint: 'next lint'
+        },
+        dependencies: {
+            next: '14.0.4',
+            react: '18.2.0',
+            'react-dom': '18.2.0',
+            '@types/node': '20.10.5',
+            '@types/react': '18.2.45',
+            '@types/react-dom': '18.2.18',
+            typescript: '5.3.3',
+            'tailwindcss': '3.3.6',
+            'autoprefixer': '10.4.16',
+            'postcss': '8.4.32',
+            '@radix-ui/react-slot': '1.0.2',
+            '@radix-ui/react-select': '2.0.0',
+            '@radix-ui/react-dialog': '1.0.5',
+            'class-variance-authority': '0.7.0',
+            'clsx': '2.0.0',
+            'tailwind-merge': '2.2.0',
+            'lucide-react': '0.303.0',
+            'next-themes': '0.2.1',
+            'd3': '7.8.5',
+            '@types/d3': '7.4.3'
+        },
+        devDependencies: {
+            eslint: '8.56.0',
+            'eslint-config-next': '14.0.4'
+        }
+    };
+    await fs.writeJson(path.join(currentDir, 'frontend/package.json'), frontendPackageJson, { spaces: 2 });
+    const nextConfigContent = `/** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
     appDir: true,
@@ -370,9 +328,8 @@ const nextConfig = {
 
 module.exports = nextConfig
 `;
-  await fs.writeFile(path.join(currentDir, 'frontend/next.config.js'), nextConfigContent);
-
-  const tailwindConfigContent = `/** @type {import('tailwindcss').Config} */
+    await fs.writeFile(path.join(currentDir, 'frontend/next.config.js'), nextConfigContent);
+    const tailwindConfigContent = `/** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
   content: [
@@ -449,18 +406,16 @@ module.exports = {
   plugins: [require("tailwindcss-animate")],
 }
 `;
-  await fs.writeFile(path.join(currentDir, 'frontend/tailwind.config.js'), tailwindConfigContent);
-
-  const postcssConfigContent = `module.exports = {
+    await fs.writeFile(path.join(currentDir, 'frontend/tailwind.config.js'), tailwindConfigContent);
+    const postcssConfigContent = `module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
   },
 }
 `;
-  await fs.writeFile(path.join(currentDir, 'frontend/postcss.config.js'), postcssConfigContent);
-
-  const tsconfigContent = `{
+    await fs.writeFile(path.join(currentDir, 'frontend/postcss.config.js'), postcssConfigContent);
+    const tsconfigContent = `{
   "compilerOptions": {
     "target": "es5",
     "lib": ["dom", "dom.iterable", "es6"],
@@ -489,12 +444,10 @@ module.exports = {
   "exclude": ["node_modules"]
 }
 `;
-  await fs.writeFile(path.join(currentDir, 'frontend/tsconfig.json'), tsconfigContent);
+    await fs.writeFile(path.join(currentDir, 'frontend/tsconfig.json'), tsconfigContent);
 }
-
-async function createConfigFiles(currentDir: string, config: any): Promise<void> {
-  // Create .env file
-  const envContent = `# Database Configuration
+async function createConfigFiles(currentDir, config) {
+    const envContent = `# Database Configuration
 DATABASE_URL=sqlite:///./data/sustainability.db
 DATABASE_TYPE=${config.database}
 
@@ -516,63 +469,58 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ENERGY_PROVIDER=aws
 REGION=us-east-1
 `;
-  await fs.writeFile(path.join(currentDir, '.env'), envContent);
-
-  // Create root package.json
-  const packageJson = {
-    name: "ai-sustainability-dashboard",
-    version: '1.0.0',
-    description: "AI Sustainability Dashboard",
-    scripts: {
-      'dev:backend': 'uvicorn backend.main:app --reload --port 8000',
-      'dev:frontend': 'cd frontend && npm run dev',
-      'dev': 'concurrently "npm run dev:backend" "npm run dev:frontend"',
-      'build:frontend': 'cd frontend && npm run build',
-      'start:backend': 'uvicorn backend.main:app --host 0.0.0.0 --port 8000',
-      'start:frontend': 'cd frontend && npm start',
-      'db:init-users': 'python backend/init_users.py',
-      'test:backend': 'pytest',
-      'test:frontend': 'cd frontend && npm test',
-      'lint:backend': 'black backend && flake8 backend',
-      'lint:frontend': 'cd frontend && npm run lint',
-      'format:backend': 'black backend',
-      'format:frontend': 'cd frontend && npm run format'
-    },
-    devDependencies: {
-      concurrently: '^8.2.2'
+    await fs.writeFile(path.join(currentDir, '.env'), envContent);
+    const packageJson = {
+        name: "ai-sustainability-dashboard",
+        version: '1.0.0',
+        description: "AI Sustainability Dashboard",
+        scripts: {
+            'dev:backend': 'uvicorn backend.main:app --reload --port 8000',
+            'dev:frontend': 'cd frontend && npm run dev',
+            'dev': 'concurrently "npm run dev:backend" "npm run dev:frontend"',
+            'build:frontend': 'cd frontend && npm run build',
+            'start:backend': 'uvicorn backend.main:app --host 0.0.0.0 --port 8000',
+            'start:frontend': 'cd frontend && npm start',
+            'db:init-users': 'python backend/init_users.py',
+            'test:backend': 'pytest',
+            'test:frontend': 'cd frontend && npm test',
+            'lint:backend': 'black backend && flake8 backend',
+            'lint:frontend': 'cd frontend && npm run lint',
+            'format:backend': 'black backend',
+            'format:frontend': 'cd frontend && npm run format'
+        },
+        devDependencies: {
+            concurrently: '^8.2.2'
+        }
+    };
+    await fs.writeJson(path.join(currentDir, 'package.json'), packageJson, { spaces: 2 });
+}
+async function installDependencies(currentDir) {
+    try {
+        console.log('Installing Python dependencies...');
+        const { execSync } = await import('child_process');
+        execSync('pip install -r requirements.txt', { cwd: currentDir, stdio: 'pipe' });
+        console.log('Installing Node.js dependencies...');
+        execSync('npm install', { cwd: currentDir, stdio: 'pipe' });
+        execSync('npm install', { cwd: path.join(currentDir, 'frontend'), stdio: 'pipe' });
     }
-  };
-  await fs.writeJson(path.join(currentDir, 'package.json'), packageJson, { spaces: 2 });
+    catch (error) {
+        throw new Error('Failed to install dependencies. Please run "pip install -r requirements.txt" and "npm install" manually.');
+    }
 }
-
-async function installDependencies(currentDir: string): Promise<void> {
-  try {
-    // Install Python dependencies
-    console.log('Installing Python dependencies...');
-    const { execSync } = await import('child_process');
-    execSync('pip install -r requirements.txt', { cwd: currentDir, stdio: 'pipe' });
-    
-    // Install Node.js dependencies
-    console.log('Installing Node.js dependencies...');
-    execSync('npm install', { cwd: currentDir, stdio: 'pipe' });
-    execSync('npm install', { cwd: path.join(currentDir, 'frontend'), stdio: 'pipe' });
-  } catch (error) {
-    throw new Error('Failed to install dependencies. Please run "pip install -r requirements.txt" and "npm install" manually.');
-  }
+function showSetupNextSteps(config) {
+    console.log('\nSetup completed! Next steps:');
+    console.log(`1. Initialize the database and create default users:`);
+    console.log(`   npm run db:init-users`);
+    console.log(`2. Start the dashboard:`);
+    console.log(`   npm run dev`);
+    console.log(`3. Access the dashboard at:`);
+    console.log(`   http://localhost:${config.port}`);
+    console.log(`4. Log in with default credentials:`);
+    console.log(`   Admin: admin / admin123`);
+    console.log(`   Developer: developer / dev123`);
+    console.log(`5. Start tracking your AI workloads:`);
+    console.log(`   ai-dashboard run python your_ai_script.py`);
+    console.log('\nHappy sustainable AI development!');
 }
-
-function showSetupNextSteps(config: any): void {
-  console.log('\nSetup completed! Next steps:');
-  console.log(`1. Initialize the database and create default users:`);
-  console.log(`   npm run db:init-users`);
-  console.log(`2. Start the dashboard:`);
-  console.log(`   npm run dev`);
-  console.log(`3. Access the dashboard at:`);
-  console.log(`   http://localhost:${config.port}`);
-  console.log(`4. Log in with default credentials:`);
-  console.log(`   Admin: admin / admin123`);
-  console.log(`   Developer: developer / dev123`);
-  console.log(`5. Start tracking your AI workloads:`);
-  console.log(`   ai-dashboard run python your_ai_script.py`);
-  console.log('\nHappy sustainable AI development!');
-}
+//# sourceMappingURL=setup.js.map

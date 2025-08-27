@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime, timedelta
 import random
 
-from core.database.database import get_db
+from core.database import get_db
 from core.database.models import Metric
 from api.schemas.metrics import MetricCreate, MetricResponse
 from api.routes.auth import get_current_user
@@ -16,7 +16,6 @@ async def get_metrics(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """Get all metrics for the current user."""
     metrics = db.query(Metric).filter(Metric.user_id == current_user.id).order_by(Metric.timestamp.desc()).all()
     return metrics
 
@@ -26,7 +25,6 @@ async def create_metric(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """Create a new metric."""
     db_metric = Metric(
         project=metric_data.project,
         energy_consumed=metric_data.energy_consumed,
@@ -50,7 +48,7 @@ async def generate_sample_data(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """Generate sample metrics data for testing."""
+    # Generate sample metrics data for testing.
     projects = ["image-classification", "nlp-model", "recommendation-system", "computer-vision"]
     environments = ["development", "production", "staging"]
     
@@ -61,7 +59,7 @@ async def generate_sample_data(
     sample_metrics = []
     
     for i in range(50):  # Generate 50 sample records
-        # Random date within the last 30 days
+        # Random date 
         random_days = random.randint(0, 30)
         random_hours = random.randint(0, 23)
         random_minutes = random.randint(0, 59)
@@ -72,19 +70,16 @@ async def generate_sample_data(
             minutes=random_minutes
         )
         
-        # Random energy consumption (0.1 to 10 kWh)
         energy_consumed = round(random.uniform(0.1, 10.0), 6)
         
-        # CO2 emissions (roughly 0.5 kg CO2 per kWh)
         emissions = round(energy_consumed * 0.5, 6)
         
-        # Duration in seconds (1 to 3600 seconds)
+        # Duration in seconds
         duration = random.randint(1, 3600)
         
-        # Water usage (0.1 to 5 mL)
+        # Water usage
         water_usage = round(random.uniform(0.1, 5.0), 6)
         
-        # GPU and CPU energy (split of total energy)
         gpu_ratio = random.uniform(0.6, 0.9)  # GPU typically uses more energy
         gpu_energy = round(energy_consumed * gpu_ratio, 6)
         cpu_energy = round(energy_consumed * (1 - gpu_ratio), 6)
@@ -109,34 +104,3 @@ async def generate_sample_data(
     db.commit()
     
     return {"message": f"Generated {len(sample_metrics)} sample metrics"}
-
-@router.get("/summary")
-async def get_metrics_summary(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
-    """Get summary statistics for metrics."""
-    metrics = db.query(Metric).filter(Metric.user_id == current_user.id).all()
-    
-    if not metrics:
-        return {
-            "total_energy": 0,
-            "total_emissions": 0,
-            "total_water": 0,
-            "total_sessions": 0,
-            "avg_duration": 0
-        }
-    
-    total_energy = sum(m.energy_consumed for m in metrics)
-    total_emissions = sum(m.emissions for m in metrics)
-    total_water = sum(m.water_usage or 0 for m in metrics)
-    total_sessions = len(metrics)
-    avg_duration = sum(m.duration for m in metrics) / total_sessions
-    
-    return {
-        "total_energy": round(total_energy, 6),
-        "total_emissions": round(total_emissions, 6),
-        "total_water": round(total_water, 6),
-        "total_sessions": total_sessions,
-        "avg_duration": round(avg_duration, 2)
-    }

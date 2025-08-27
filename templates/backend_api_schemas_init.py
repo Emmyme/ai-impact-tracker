@@ -1,3 +1,1 @@
-# API Schemas
-from . import user
-from . import metrics
+# API schemas module initialization

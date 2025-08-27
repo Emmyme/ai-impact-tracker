@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import timedelta
 
-from core.database.database import get_db
+from core.database import get_db
 from core.security import verify_password, get_password_hash, create_access_token, verify_token
 from core.config import settings
 from core.database.models import User
@@ -13,7 +13,7 @@ from api.schemas.user import UserCreate, UserResponse, UserLogin, Token, Passwor
 router = APIRouter()
 security = HTTPBearer()
 
-def get_current_user(db: Session, credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
     """Get current user from token."""
     payload = verify_token(credentials.credentials)
     if payload is None:
@@ -93,7 +93,7 @@ def require_roles(db: Session, credentials: HTTPAuthorizationCredentials, roles:
 
 @router.post("/login", response_model=Token)
 async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-    """Authenticate user and return access token."""
+    # Authenticate user and return access token.
     user = db.query(User).filter(User.username == user_credentials.username).first()
     
     if not user or not user.is_active:
@@ -125,9 +125,9 @@ async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
 async def register_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(lambda: require_roles(db, Depends(security)(), ["admin", "developer"]))
+    current_user: User = Depends(get_admin_or_developer_user)
 ):
-    """Register a new user (admin/developer only)."""
+    # Register a new user (admin/developer only).
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == user_data.username).first()
     if existing_user:
@@ -168,7 +168,7 @@ async def setup_password(
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Set password for first-time users."""
+    # Set password for first-time users.
     current_user = require_auth(db, credentials)
     
     if not current_user.needs_password_setup:
@@ -187,7 +187,7 @@ async def setup_password(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current user information."""
+    # Get current user information.
     return current_user
 
 @router.get("/users", response_model=List[UserResponse])
@@ -195,7 +195,7 @@ async def get_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    """Get all users (admin only)."""
+    # Get all users (admin only).
     users = db.query(User).all()
     return users
 
@@ -205,7 +205,7 @@ async def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
-    """Get specific user (admin only)."""
+    # Get specific user (admin only).
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(

@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-
+import { spawn } from 'child_process';
 import { createProject } from './cli/create.js';
-import { runAI } from './cli/run.js';
-import { setupDashboard } from './cli/setup.js';
+import inquirer from 'inquirer';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import dotenv from 'dotenv';
 import packageJson from '../package.json' assert { type: 'json' };
+
+
+dotenv.config();
 
 const program = new Command();
 
 program
   .name('ai-impact-tracker')
-  .description('AI Sustainability Dashboard - Track environmental impact of AI workloads')
+  .description('Track environmental impact of AI workloads')
   .version(packageJson.version);
 
 program
@@ -22,91 +28,309 @@ program
   .action(async (projectName: string, options: { template: string; yes: boolean }) => {
     try {
       await createProject(projectName, options);
-      } catch (error) {
-    console.error('Error creating project:', error);
-    process.exit(1);
-  }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      process.exit(1);
+    }
   });
 
 program
-  .command('run')
-  .description('Run an AI script with environmental impact tracking')
-  .option('-p, --project <project>', 'Project name for this run', 'default')
-  .option('-t, --team <team>', 'Team name for this run', 'default')
-  .option('-e, --environment <env>', 'Environment (development, staging, production)', 'development')
-  .option('-c, --config <path>', 'Path to dashboard config file')
-  .option('--no-track', 'Disable tracking for this run')
-  .option('--dry-run', 'Show what would be tracked without actually running')
-  .argument('<script...>', 'Script command to run')
-  .action(async (script: string[], options: {
-    project?: string;
-    team?: string;
-    environment?: string;
-    config?: string;
-    track?: boolean;
-    dryRun?: boolean;
-  }) => {
+  .argument('<script...>', 'AI script to run (e.g., python train.py)')
+  .option('-p, --project <name>', 'Project name')
+  .option('-t, --team <name>', 'Team name')
+  .option('-e, --environment <env>', 'Environment')
+  .option('--dashboard-url <url>', 'Dashboard URL', 'http://localhost:8000')
+  .action(async (script: string[], options: { project?: string; team?: string; environment?: string; dashboardUrl?: string }) => {
     try {
-      console.log('Debug - Raw options:', options);
-      console.log('Debug - Raw script args:', script);
+      const scriptCommand = script.join(' ');
       
-      let project = options.project;
-      let team = options.team;
-      let environment = options.environment;
-      
-      const scriptArgs = [...script];
-      
-      if (scriptArgs.length >= 3) {
-        const lastThree = scriptArgs.slice(-3);
-        if (lastThree[0] !== 'python' && lastThree[1] !== 'test_image_training.py') {
-          project = lastThree[0];
-          team = lastThree[1];
-          environment = lastThree[2];
-          
-          scriptArgs.splice(-3);
+      // Interactive prompts for missing options
+      const answers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'project',
+          message: 'Project name:',
+          default: options.project || 'default',
+          when: !options.project
+        },
+        {
+          type: 'input',
+          name: 'team',
+          message: 'Team name:',
+          default: options.team || 'default',
+          when: !options.team
+        },
+        {
+          type: 'list',
+          name: 'environment',
+          message: 'Environment:',
+          choices: ['development', 'staging', 'production'],
+          default: options.environment || 'development',
+          when: !options.environment
         }
+      ]);
+      
+      const project = options.project || answers.project;
+      const team = options.team || answers.team;
+      const environment = options.environment || answers.environment;
+      const dashboardUrl = options.dashboardUrl || process.env.DASHBOARD_URL || 'http://localhost:8000';
+      
+      console.log('AI Impact Tracker');
+      console.log(`Project: ${project}`);
+      console.log(`Team: ${team}`);
+      console.log(`Environment: ${environment}`);
+      console.log(`Dashboard: ${dashboardUrl}`);
+      console.log(`Running: ${scriptCommand}`);
+      
+      // Check and install required Python dependencies
+      console.log('🔧 Checking Python dependencies...');
+      try {
+        await checkAndInstallDependencies();
+      } catch (error) {
+        console.log("Couldn't install dependencies, continuing anyway...");
       }
       
-      const scriptCommand = scriptArgs.join(' ');
+      // Create Python wrapper that handles tracking and sends data to dashboard
+      const pythonWrapper = `
+import os, sys, subprocess, time, requests
+from datetime import datetime
+
+# Set environment variables
+os.environ['AI_DASHBOARD_PROJECT'] = '${project}'
+os.environ['AI_DASHBOARD_TEAM'] = '${team}'
+os.environ['AI_DASHBOARD_ENVIRONMENT'] = '${environment}'
+os.environ['AI_DASHBOARD_RUN_ID'] = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+print('Starting environmental tracking...')
+
+# Try to use CodeCarbon if available
+try:
+    from codecarbon import EmissionsTracker
+    tracker = EmissionsTracker(
+        project_name='${project}',
+        save_to_file=True,
+        output_file=f'./data/{os.environ["AI_DASHBOARD_RUN_ID"]}_emissions.csv',
+        log_level='error'
+    )
+    tracker.start()
+    print('CodeCarbon tracking initialized')
+except ImportError:
+    print('CodeCarbon not available - using basic timing')
+    tracker = None
+
+# Run the AI script
+start_time = time.time()
+cmd = ${JSON.stringify(script)}
+print(f'Executing: {" ".join(cmd)}')
+
+try:
+    result = subprocess.run(cmd, check=False)
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    # Calculate metrics
+    if tracker:
+        emissions = tracker.stop()
+        energy_consumed = emissions
+        co2_emissions = emissions * 0.5
+    else:
+        energy_consumed = duration * 0.1  # Rough estimate
+        co2_emissions = energy_consumed * 0.5
+    
+    # Calculate water usage (cooling for data centers)
+    water_usage = energy_consumed * 2.0  # Rough estimate: 2L per kWh
+    
+    print(f'Energy consumed: {energy_consumed:.4f} kWh')
+    print(f'CO2 emissions: {co2_emissions:.4f} g')
+    print(f'Water usage: {water_usage:.4f} L')
+    print(f'Duration: {duration:.2f} seconds')
+    
+    # Send data to dashboard
+    try:
+        # First try to authenticate
+        username = os.environ.get('DASHBOARD_USERNAME', 'admin')
+        password = os.environ.get('DASHBOARD_PASSWORD', 'admin123')
+        login_data = {'username': username, 'password': password}
+        login_response = requests.post('${dashboardUrl}/api/auth/login', json=login_data, timeout=10)
+        
+        if login_response.status_code == 200:
+            token = login_response.json().get('access_token')
+            if token:
+                data = {
+                    'project': '${project}',
+                    'team': '${team}',
+                    'environment': '${environment}',
+                    'energy_consumed': energy_consumed,
+                    'emissions': co2_emissions,
+                    'water_usage': water_usage,
+                    'duration': duration,
+                    'timestamp': datetime.now().isoformat()
+                }
+                print(f'Sending metrics to dashboard: {data}')
+                headers = {'Authorization': f'Bearer {token}'}
+                response = requests.post('${dashboardUrl}/api/metrics', json=data, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    print('Data sent to dashboard successfully!')
+                else:
+                    print(f'Dashboard response: {response.status_code}')
+            else:
+                print('No access token received')
+        else:
+            print(f'Could not authenticate: {login_response.status_code}')
+    except Exception as e:
+        print(f'Could not send to dashboard: {e}')
+    
+    if result.returncode == 0:
+        print('AI training completed successfully')
+    else:
+        print(f'AI training failed (exit code: {result.returncode})')
+    
+    sys.exit(result.returncode)
+    
+except Exception as e:
+    if tracker:
+        tracker.stop()
+    print(f'Error: {e}')
+    sys.exit(1)
+`;
+
+      // Write Python wrapper to temporary file and execute it
+      const tempFile = path.join(os.tmpdir(), `ai-tracker-${Date.now()}.py`);
+      await fs.writeFile(tempFile, pythonWrapper);
       
-      console.log('Script command:', scriptCommand);
-      console.log('Project:', project);
-      console.log('Team:', team);
-      console.log('Environment:', environment);
+      const child = spawn('python', [tempFile], {
+        stdio: 'inherit',
+        shell: true,
+        env: { ...process.env, PYTHONPATH: process.cwd() }
+      });
       
-      await runAI(scriptCommand, { ...options, project: project || 'default', team: team || 'default', environment: environment || 'development' });
-      } catch (error) {
-    console.error('Error running AI script:', error);
-    process.exit(1);
-  }
+      child.on('close', async (code) => {
+        // Clean up temp file
+        try {
+          await fs.remove(tempFile);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        
+        if (code !== 0) {
+          console.error(`AI training failed with exit code ${code}`);
+          process.exit(code);
+        }
+      });
+      
+      child.on('error', async (error) => {
+        // Clean up temp file
+        try {
+          await fs.remove(tempFile);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        
+        console.error('Failed to start AI training:', error);
+        process.exit(1);
+      });
+      
+    } catch (error) {
+      console.error('Error:', error);
+      process.exit(1);
+    }
   });
 
-program
-  .command('setup')
-  .description('Setup dashboard for an existing project')
-  .option('-c, --config <path>', 'Path to config file')
-  .option('-d, --database <url>', 'Database connection URL')
-  .option('-p, --port <port>', 'Dashboard port', '3000')
-  .action(async (options: { config?: string; database?: string; port?: string }) => {
-    try {
-      await setupDashboard(options);
-      } catch (error) {
-    console.error('Error setting up dashboard:', error);
-    process.exit(1);
-  }
-  });
+async function checkAndInstallDependencies(): Promise<void> {
+  return new Promise(async (resolve, reject) => {
+    // Check if required packages are installed
+    const checkCommand = `python -c "
+try:
+    import carbontracker
+    import requests
+    import codecarbon
 
-program
-  .command('status')
-  .description('Show dashboard status and configuration')
-  .action(async () => {
-    try {
-          console.log('Dashboard status command coming soon...');
-  } catch (error) {
-    console.error('Error getting status:', error);
-    process.exit(1);
-  }
+    print('All dependencies available')
+except ImportError as e:
+    print(f'Missing dependency: {e}')
+    exit(1)
+"`;
+
+    const checkChild = spawn('python', ['-c', checkCommand], {
+      stdio: 'pipe',
+      shell: true
+    });
+
+    let output = '';
+    checkChild.stdout?.on('data', (data) => {
+      output += data.toString();
+    });
+
+    checkChild.on('close', async (code) => {
+      if (code === 0) {
+        console.log('Dependencies ready');
+        resolve();
+      } else {
+        // Ask for permission to install dependencies
+        const { installDeps } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'installDeps',
+            message: 'Missing dependencies (carbontracker, codecarbon, requests). Install them now?',
+            default: true
+          }
+        ]);
+        
+        if (installDeps) {
+          console.log('Installing required dependencies...');
+          installDependencies().then(resolve).catch(reject);
+        } else {
+          console.log('Skipping dependency installation. The script will not be able to track the environmental impact.');
+          resolve();
+        }
+      }
+    });
+
+    checkChild.on('error', async () => {
+      // Ask for permission to install dependencies
+      const { installDeps } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'installDeps',
+          message: 'Missing dependencies (carbontracker, codecarbon, requests). Install them now?',
+          default: true
+        }
+      ]);
+      
+      if (installDeps) {
+        console.log('Installing required dependencies...');
+        installDependencies().then(resolve).catch(reject);
+      } else {
+        console.log('Skipping dependency installation. Some features may not work.');
+        resolve();
+      }
+    });
   });
+}
+
+async function installDependencies(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    console.log('Installing carbontracker, codecarbon, and requests...');
+    
+    const installChild = spawn('pip', ['install', 'carbontracker', 'codecarbon', 'requests'], {
+      stdio: 'inherit',
+      shell: true
+    });
+
+    installChild.on('close', (code) => {
+      if (code === 0) {
+        console.log('Dependencies installed successfully');
+        resolve();
+      } else {
+        reject(new Error(`Failed to install dependencies (exit code: ${code})`));
+      }
+    });
+
+    installChild.on('error', (error) => {
+      reject(new Error(`Failed to install dependencies: ${error.message}`));
+    });
+  });
+}
 
 program.parse();
 

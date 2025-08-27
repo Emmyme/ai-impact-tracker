@@ -1,10 +1,9 @@
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "sqlite:///./data/sustainability.db"
+    database_url: str = "sqlite:///../data/sustainability.db"
     database_type: str = "sqlite"
     
     # Server
@@ -21,6 +20,10 @@ class Settings(BaseSettings):
     energy_provider: str = "local"
     region: str = "local"
     # For local training, CodeCarbon will use default grid intensity
+    
+    # Development settings
+    debug: bool = False
+    log_level: str = "info"
     
     # PostgreSQL settings
     postgres_host: Optional[str] = None
@@ -39,5 +42,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 settings = Settings()

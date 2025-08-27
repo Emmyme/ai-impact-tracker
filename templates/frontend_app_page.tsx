@@ -4,51 +4,97 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Modal } from "@/components/ui/modal";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { UserManagement } from "@/components/auth/user-management";
+import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/contexts/auth-context";
+import { ModeToggle } from "@/components/mode-toggle";
+import { getMetricsUrl } from "@/config/api";
+
 import {
-  LogOut,
-  User,
-  Activity,
+  Leaf,
   Zap,
   Droplets,
-  Leaf,
+  Clock,
+  Users,
+  FolderOpen,
   RefreshCw,
+  User,
+  LogOut,
 } from "lucide-react";
 import * as d3 from "d3";
 
 interface Metric {
   id: number;
   project: string;
-  energy_consumption: number;
-  co2_emissions: number;
-  water_usage: number;
+  energy_consumed: number;
+  emissions: number;
   duration: number;
   timestamp: string;
   environment: string;
+  water_usage?: number;
 }
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showUserManagement, setShowUserManagement] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   const sessionsPerPage = 5;
   const chartRef = useRef<HTMLDivElement>(null);
-  const energyChartRef = useRef<HTMLDivElement>(null);
-  const comparisonChartRef = useRef<HTMLDivElement>(null);
-  const environmentalChartRef = useRef<HTMLDivElement>(null);
+  const barChartRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
+  useEffect(() => {
+    if (user && !loading) {
+      fetchMetrics();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (metrics.length > 0 && chartRef.current && !loading) {
+      createEnergyChart();
+    }
+  }, [metrics, loading]);
+
+  useEffect(() => {
+    if (metrics.length > 0 && barChartRef.current) {
+      createProjectComparisonChart();
+    }
+  }, [metrics]);
 
   const fetchMetrics = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/metrics");
+      console.log("Fetching metrics from backend...");
+      const token = localStorage.getItem("authToken");
+
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
+      const response = await fetch(getMetricsUrl(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
+        console.log("Fetched metrics:", data);
         setMetrics(data);
+      } else {
+        console.error(
+          "Failed to fetch metrics:",
+          response.status,
+          response.statusText
+        );
       }
     } catch (error) {
       console.error("Failed to fetch metrics:", error);
@@ -57,581 +103,743 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchMetrics();
-  }, []);
+  const createEnergyChart = () => {
+    if (!chartRef.current) return;
 
-  // Fetch metrics when user logs in
-  useEffect(() => {
-    if (user) {
-      fetchMetrics();
-    }
-  }, [user]);
+    // Clear previous chart
+    d3.select(chartRef.current).selectAll("*").remove();
 
-  // Create energy consumption line chart
-  useEffect(() => {
-    if (metrics.length > 0 && energyChartRef.current && !loading) {
-      const margin = { top: 20, right: 30, bottom: 30, left: 60 };
-      const width = 600 - margin.left - margin.right;
-      const height = 300 - margin.top - margin.bottom;
+    const margin = { top: 80, right: 30, bottom: 50, left: 60 };
+    const width = 600 - margin.left - margin.right;
+    const height = 300 - margin.top - margin.bottom;
 
-      // Clear previous chart
-      d3.select(energyChartRef.current).selectAll("*").remove();
+    const svg = d3
+      .select(chartRef.current)
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      const svg = d3
-        .select(energyChartRef.current)
-        .append("svg")
-        .attr("width", width + margin.right + margin.left)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
-      const data = metrics.slice(-10).map((m, i) => ({
-        index: i,
-        energy: m.energy_consumption,
-        water: m.water_usage || 0,
-        timestamp: new Date(m.timestamp),
+    // Prepare data - last 10 sessions, sorted by timestamp
+    const chartData = metrics
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+      .slice(-10)
+      .map((metric, index) => ({
+        session: `Session ${index + 1}`,
+        energy: metric.energy_consumed * 1000, // Convert to Wh for better visibility
+        emissions: metric.emissions * 1000, // Convert to mg CO2 (since we store in g)
+        water: (metric.water_usage || 0) * 1, // Keep in mL (since we store in mL)
+        timestamp: new Date(metric.timestamp),
+        project: metric.project,
       }));
 
-      const x = d3
-        .scaleLinear()
-        .domain([0, data.length - 1])
-        .range([0, width]);
+    // X scale (time-based)
+    const x = d3
+      .scalePoint()
+      .range([0, width])
+      .domain(chartData.map((d) => d.session))
+      .padding(0.5);
 
-      const y = d3
-        .scaleLinear()
-        .domain([0, d3.max(data, (d) => Math.max(d.energy, d.water)) || 0])
-        .range([height, 0]);
+    // Y scale - use the maximum value across all metrics for better scaling
+    const maxValue =
+      d3.max(chartData, (d) => Math.max(d.energy, d.emissions, d.water)) || 0;
 
-      // Add energy line
-      const energyLine = d3
-        .line<{
-          index: number;
-          energy: number;
-          water: number;
-          timestamp: Date;
-        }>()
-        .x((d) => x(d.index))
-        .y((d) => y(d.energy))
-        .curve(d3.curveMonotoneX);
+    const y = d3.scaleLinear().domain([0, maxValue]).range([height, 0]);
 
-      svg
-        .append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "#22c55e")
-        .attr("stroke-width", 3)
-        .attr("d", energyLine);
+    // Create line generators for each metric
+    const energyLine = d3
+      .line<{
+        session: string;
+        energy: number;
+        emissions: number;
+        water: number;
+        timestamp: Date;
+        project: string;
+      }>()
+      .x((d) => x(d.session) || 0)
+      .y((d) => y(d.energy))
+      .curve(d3.curveMonotoneX);
 
-      // Add water line
-      const waterLine = d3
-        .line<{
-          index: number;
-          energy: number;
-          water: number;
-          timestamp: Date;
-        }>()
-        .x((d) => x(d.index))
-        .y((d) => y(d.water))
-        .curve(d3.curveMonotoneX);
+    const emissionsLine = d3
+      .line<{
+        session: string;
+        energy: number;
+        emissions: number;
+        water: number;
+        timestamp: Date;
+        project: string;
+      }>()
+      .x((d) => x(d.session) || 0)
+      .y((d) => y(d.emissions))
+      .curve(d3.curveMonotoneX);
 
-      svg
-        .append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3)
-        .attr("d", waterLine);
+    const waterLine = d3
+      .line<{
+        session: string;
+        energy: number;
+        emissions: number;
+        water: number;
+        timestamp: Date;
+        project: string;
+      }>()
+      .x((d) => x(d.session) || 0)
+      .y((d) => y(d.water))
+      .curve(d3.curveMonotoneX);
 
-      // Add axes
-      svg
-        .append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x).ticks(data.length));
+    // Add X axis
+    svg
+      .append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .style("text-anchor", "end")
+      .style("fill", "currentColor")
+      .attr("dx", "-.8em")
+      .attr("dy", ".15em")
+      .attr("transform", "rotate(-45)");
 
-      svg.append("g").call(d3.axisLeft(y));
+    // Add Y axis
+    svg
+      .append("g")
+      .call(d3.axisLeft(y))
+      .selectAll("text")
+      .style("fill", "currentColor");
 
-      // Add legend
-      const legend = svg
-        .append("g")
-        .attr("transform", `translate(${width - 100}, 20)`);
+    // Add the line paths
+    svg
+      .append("path")
+      .datum(chartData)
+      .attr("fill", "none")
+      .attr("stroke", "#10b981")
+      .attr("stroke-width", 3)
+      .attr("d", energyLine);
 
-      legend
-        .append("line")
-        .attr("x1", 0)
-        .attr("x2", 20)
-        .attr("y1", 0)
-        .attr("y2", 0)
-        .attr("stroke", "#22c55e")
-        .attr("stroke-width", 3);
+    svg
+      .append("path")
+      .datum(chartData)
+      .attr("fill", "none")
+      .attr("stroke", "#ef4444")
+      .attr("stroke-width", 3)
+      .attr("d", emissionsLine);
 
-      legend
-        .append("text")
-        .attr("x", 25)
-        .attr("y", 0)
-        .attr("dy", "0.35em")
-        .text("Energy")
-        .style("fill", "currentColor");
+    svg
+      .append("path")
+      .datum(chartData)
+      .attr("fill", "none")
+      .attr("stroke", "#06b6d4")
+      .attr("stroke-width", 3)
+      .attr("d", waterLine);
 
-      legend
-        .append("line")
-        .attr("x1", 0)
-        .attr("x2", 20)
-        .attr("y1", 20)
-        .attr("y2", 20)
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3);
+    // Add data points for energy
+    svg
+      .selectAll("circle.energy")
+      .data(chartData)
+      .enter()
+      .append("circle")
+      .attr("class", "energy")
+      .attr("cx", (d) => x(d.session) || 0)
+      .attr("cy", (d) => y(d.energy))
+      .attr("r", 4)
+      .attr("fill", "#10b981")
+      .attr("opacity", 0.8)
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("opacity", 1).attr("r", 6);
+        svg
+          .append("text")
+          .attr("class", "tooltip")
+          .attr("x", (x(d.session) || 0) + 10)
+          .attr("y", y(d.energy) - 10)
+          .attr("text-anchor", "start")
+          .style("font-size", "12px")
+          .style("font-weight", "bold")
+          .style("fill", "currentColor")
+          .text(`Energy: ${d.energy.toFixed(1)} Wh`);
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("opacity", 0.8).attr("r", 4);
+        svg.selectAll(".tooltip").remove();
+      });
 
-      legend
-        .append("text")
-        .attr("x", 25)
-        .attr("y", 20)
-        .attr("dy", "0.35em")
-        .text("Water")
-        .style("fill", "currentColor");
-    }
-  }, [metrics, loading]);
+    // Add data points for emissions
+    svg
+      .selectAll("circle.emissions")
+      .data(chartData)
+      .enter()
+      .append("circle")
+      .attr("class", "emissions")
+      .attr("cx", (d) => x(d.session) || 0)
+      .attr("cy", (d) => y(d.emissions))
+      .attr("r", 4)
+      .attr("fill", "#ef4444")
+      .attr("opacity", 0.8)
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("opacity", 1).attr("r", 6);
+        svg
+          .append("text")
+          .attr("class", "tooltip")
+          .attr("x", (x(d.session) || 0) + 10)
+          .attr("y", y(d.emissions) - 10)
+          .attr("text-anchor", "start")
+          .style("font-size", "12px")
+          .style("font-weight", "bold")
+          .style("fill", "currentColor")
+          .text(`CO₂: ${d.emissions.toFixed(1)} mg`);
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("opacity", 0.8).attr("r", 4);
+        svg.selectAll(".tooltip").remove();
+      });
 
-  // Create project comparison chart
-  useEffect(() => {
-    if (metrics.length > 0 && comparisonChartRef.current && !loading) {
-      const margin = { top: 40, right: 30, bottom: 60, left: 60 };
-      const width = 600 - margin.left - margin.right;
-      const height = 300 - margin.top - margin.bottom;
+    // Add data points for water
+    svg
+      .selectAll("circle.water")
+      .data(chartData)
+      .enter()
+      .append("circle")
+      .attr("class", "water")
+      .attr("cx", (d) => x(d.session) || 0)
+      .attr("cy", (d) => y(d.water))
+      .attr("r", 4)
+      .attr("fill", "#06b6d4")
+      .attr("opacity", 0.8)
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("opacity", 1).attr("r", 6);
+        svg
+          .append("text")
+          .attr("class", "tooltip")
+          .attr("x", (x(d.session) || 0) + 10)
+          .attr("y", y(d.water) - 10)
+          .attr("text-anchor", "start")
+          .style("font-size", "12px")
+          .style("font-weight", "bold")
+          .style("fill", "currentColor")
+          .text(`Water: ${d.water.toFixed(1)} mL`);
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("opacity", 0.8).attr("r", 4);
+        svg.selectAll(".tooltip").remove();
+      });
 
-      // Clear previous chart
-      d3.select(comparisonChartRef.current).selectAll("*").remove();
+    // Add legend
+    const legend = svg.append("g").attr("class", "legend");
 
-      const svg = d3
-        .select(comparisonChartRef.current)
-        .append("svg")
-        .attr("width", width + margin.right + margin.left)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+    // Energy legend
+    legend
+      .append("line")
+      .attr("x1", width - 160)
+      .attr("y1", -70)
+      .attr("x2", width - 140)
+      .attr("y2", -70)
+      .attr("stroke", "#10b981")
+      .attr("stroke-width", 2);
 
-      // Group by project
-      const projectData = d3.group(metrics, (d) => d.project);
-      const projectAverages = Array.from(projectData.entries()).map(
-        ([project, data]) => ({
-          project,
-          avgEnergy: d3.mean(data, (d) => d.energy_consumption) || 0,
-          avgCO2: d3.mean(data, (d) => d.co2_emissions) || 0,
-          avgWater: d3.mean(data, (d) => d.water_usage) || 0,
-        })
-      );
+    legend
+      .append("text")
+      .attr("x", width - 135)
+      .attr("y", -67)
+      .style("font-size", "12px")
+      .style("fill", "currentColor")
+      .text("Energy (Wh)");
 
-      const x = d3
-        .scalePoint()
-        .domain(projectAverages.map((d) => d.project))
-        .range([0, width])
-        .padding(0.1);
+    // Emissions legend
+    legend
+      .append("line")
+      .attr("x1", width - 160)
+      .attr("y1", -50)
+      .attr("x2", width - 140)
+      .attr("y2", -50)
+      .attr("stroke", "#ef4444")
+      .attr("stroke-width", 2);
 
-      const y = d3
-        .scaleLinear()
-        .domain([0, d3.max(projectAverages, (d) => d.avgEnergy) || 0])
-        .range([height, 0]);
+    legend
+      .append("text")
+      .attr("x", width - 135)
+      .attr("y", -47)
+      .style("font-size", "12px")
+      .style("fill", "currentColor")
+      .text("CO₂ (mg)");
 
-      // Add bars
-      svg
-        .selectAll(".bar")
-        .data(projectAverages)
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("x", (d) => x(d.project) || 0)
-        .attr("width", x.bandwidth())
-        .attr("y", (d) => y(d.avgEnergy))
-        .attr("height", (d) => height - y(d.avgEnergy))
-        .attr("fill", "#22c55e");
+    // Water legend
+    legend
+      .append("line")
+      .attr("x1", width - 160)
+      .attr("y1", -30)
+      .attr("x2", width - 140)
+      .attr("y2", -30)
+      .attr("stroke", "#06b6d4")
+      .attr("stroke-width", 2);
 
-      // Add axes
-      svg
-        .append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x))
-        .selectAll("text")
-        .style("text-anchor", "end")
-        .attr("dx", "-.8em")
-        .attr("dy", ".15em")
-        .attr("transform", "rotate(-45)")
-        .style("fill", "currentColor");
+    legend
+      .append("text")
+      .attr("x", width - 135)
+      .attr("y", -27)
+      .style("font-size", "12px")
+      .style("fill", "currentColor")
+      .text("Water (mL)");
+  };
 
-      svg.append("g").call(d3.axisLeft(y)).style("fill", "currentColor");
-    }
-  }, [metrics, loading]);
+  const createProjectComparisonChart = () => {
+    if (!barChartRef.current) return;
 
-  // Create environmental impact chart
-  useEffect(() => {
-    if (metrics.length > 0 && environmentalChartRef.current && !loading) {
-      const margin = { top: 20, right: 30, bottom: 30, left: 60 };
-      const width = 600 - margin.left - margin.right;
-      const height = 300 - margin.top - margin.bottom;
+    // Clear previous chart
+    d3.select(barChartRef.current).selectAll("*").remove();
 
-      // Clear previous chart
-      d3.select(environmentalChartRef.current).selectAll("*").remove();
+    const margin = { top: 80, right: 30, bottom: 50, left: 60 };
+    const width = 600 - margin.left - margin.right;
+    const height = 300 - margin.top - margin.bottom;
 
-      const svg = d3
-        .select(environmentalChartRef.current)
-        .append("svg")
-        .attr("width", width + margin.right + margin.left)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+    const svg = d3
+      .select(barChartRef.current)
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      const data = metrics.slice(-10).map((m, i) => ({
-        index: i,
-        co2: m.co2_emissions,
-        water: m.water_usage || 0,
-        timestamp: new Date(m.timestamp),
-      }));
+    // Group data by project
+    const projectData = d3.group(metrics, (d) => d.project);
+    const chartData = Array.from(projectData.entries()).map(
+      ([project, sessions]) => ({
+        project,
+        totalEnergy: d3.sum(sessions, (d) => d.energy_consumed) * 1000000, // Convert to micro-kWh
+        totalEmissions: d3.sum(sessions, (d) => d.emissions) * 1000000, // Convert to micro-kg
+        sessionCount: sessions.length,
+      })
+    );
 
-      const x = d3
-        .scaleLinear()
-        .domain([0, data.length - 1])
-        .range([0, width]);
+    // X scale
+    const x = d3
+      .scaleBand()
+      .range([0, width])
+      .domain(chartData.map((d) => d.project))
+      .padding(0.2);
 
-      const y = d3
-        .scaleLinear()
-        .domain([0, d3.max(data, (d) => Math.max(d.co2, d.water)) || 0])
-        .range([height, 0]);
+    // Y scale
+    const y = d3
+      .scaleLinear()
+      .domain([0, d3.max(chartData, (d) => d.totalEnergy) || 0])
+      .range([height, 0]);
 
-      // Add CO2 line
-      const co2Line = d3
-        .line<{ index: number; co2: number; water: number; timestamp: Date }>()
-        .x((d) => x(d.index))
-        .y((d) => y(d.co2))
-        .curve(d3.curveMonotoneX);
+    // Add X axis
+    svg
+      .append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .style("text-anchor", "middle")
+      .style("fill", "currentColor")
+      .attr("dy", ".8em");
 
-      svg
-        .append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "#ef4444")
-        .attr("stroke-width", 3)
-        .attr("d", co2Line);
+    // Add Y axis
+    svg
+      .append("g")
+      .call(d3.axisLeft(y))
+      .selectAll("text")
+      .style("fill", "currentColor");
 
-      // Add water line
-      const waterLine = d3
-        .line<{ index: number; co2: number; water: number; timestamp: Date }>()
-        .x((d) => x(d.index))
-        .y((d) => y(d.water))
-        .curve(d3.curveMonotoneX);
+    // Add bars
+    svg
+      .selectAll("rect")
+      .data(chartData)
+      .enter()
+      .append("rect")
+      .attr("x", (d) => x(d.project) || 0)
+      .attr("y", (d) => y(d.totalEnergy))
+      .attr("width", x.bandwidth())
+      .attr("height", (d) => height - y(d.totalEnergy))
+      .attr("fill", "#10b981")
+      .attr("opacity", 0.8)
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("opacity", 1);
+        svg
+          .append("text")
+          .attr("class", "tooltip")
+          .attr("x", (x(d.project) || 0) + x.bandwidth() / 2)
+          .attr("y", y(d.totalEnergy) - 20)
+          .attr("text-anchor", "middle")
+          .style("fill", "currentColor")
+          .text(
+            `${d.totalEnergy.toFixed(2)} μkWh (${d.sessionCount} sessions)`
+          );
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("opacity", 0.8);
+        svg.selectAll(".tooltip").remove();
+      });
+  };
 
-      svg
-        .append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3)
-        .attr("d", waterLine);
+  const totalEnergy = metrics.reduce(
+    (sum, metric) => sum + metric.energy_consumed,
+    0
+  );
+  const totalEmissions = metrics.reduce(
+    (sum, metric) => sum + metric.emissions,
+    0
+  );
+  const totalWaterUsage = metrics.reduce(
+    (sum, metric) => sum + (metric.water_usage || 0),
+    0
+  );
+  const totalDuration = metrics.reduce(
+    (sum, metric) => sum + metric.duration,
+    0
+  );
+  const uniqueProjects = new Set(metrics.map((m) => m.project)).size;
 
-      // Add axes
-      svg
-        .append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x).ticks(data.length));
-
-      svg.append("g").call(d3.axisLeft(y));
-
-      // Add legend
-      const legend = svg
-        .append("g")
-        .attr("transform", `translate(${width - 100}, 20)`);
-
-      legend
-        .append("line")
-        .attr("x1", 0)
-        .attr("x2", 20)
-        .attr("y1", 0)
-        .attr("y2", 0)
-        .attr("stroke", "#ef4444")
-        .attr("stroke-width", 3);
-
-      legend
-        .append("text")
-        .attr("x", 25)
-        .attr("y", 0)
-        .attr("dy", "0.35em")
-        .text("CO₂")
-        .style("fill", "currentColor");
-
-      legend
-        .append("line")
-        .attr("x1", 0)
-        .attr("x2", 20)
-        .attr("y1", 20)
-        .attr("y2", 20)
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3);
-
-      legend
-        .append("text")
-        .attr("x", 25)
-        .attr("y", 20)
-        .attr("dy", "0.35em")
-        .text("Water")
-        .style("fill", "currentColor");
-    }
-  }, [metrics, loading]);
-
-  // Pagination for recent training sessions
-  const totalPages = Math.ceil(metrics.length / sessionsPerPage);
+  // Pagination - Sort by timestamp (newest first) then paginate
+  const sortedMetrics = metrics
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  const totalPages = Math.ceil(sortedMetrics.length / sessionsPerPage);
   const startIndex = (currentPage - 1) * sessionsPerPage;
   const endIndex = startIndex + sessionsPerPage;
-  const currentSessions = metrics.slice(startIndex, endIndex);
-
-  const handleLogout = () => {
-    logout();
-  };
+  const currentSessions = sortedMetrics.slice(startIndex, endIndex);
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b bg-card">
-          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
                 AI Sustainability Dashboard
               </h1>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchMetrics}
-                className="text-green-600 hover:text-green-700"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <p className="text-muted-foreground mt-2">
+                Track environmental impact of AI workloads
+              </p>
+            </div>
+            <div className="flex gap-2 items-center">
+              {user && (
+                <div className="flex items-center gap-2 mr-4">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    {user.full_name} ({user.role})
+                  </span>
+                  {(user.role === "admin" || user.role === "developer") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowUserManagement(true)}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Manage Users
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={logout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
+              )}
+              <ModeToggle />
+              <Button onClick={fetchMetrics} disabled={loading}>
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="h-4 w-4" />
-                <span className="font-medium">{user?.full_name}</span>
-                <Badge variant="secondary">{user?.role}</Badge>
-              </div>
-              {(user?.role === "admin" || user?.role === "developer") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUserManagement(true)}
-                >
-                  Manage Users
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
           </div>
-        </header>
 
-        {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Total Energy
-                    </CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {metrics
-                        .reduce(
-                          (sum, m) => sum + (m.energy_consumption || 0),
-                          0
-                        )
-                        .toFixed(9)}{" "}
-                      kWh
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Energy
+                </CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {totalEnergy.toFixed(2)} kWh
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {metrics.length} training sessions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  CO₂ Emissions
+                </CardTitle>
+                <Leaf className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {totalEmissions.toFixed(2)} g
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Carbon footprint
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Duration
+                </CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {(totalDuration / 3600).toFixed(1)}h
+                </div>
+                <p className="text-xs text-muted-foreground">Training time</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Water Usage
+                </CardTitle>
+                <Droplets className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {totalWaterUsage.toFixed(2)} mL
+                </div>
+                <p className="text-xs text-muted-foreground">Cooling water</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Projects</CardTitle>
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{uniqueProjects}</div>
+                <p className="text-xs text-muted-foreground">Active projects</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Environmental Impact Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div
+                  ref={chartRef}
+                  className="w-full h-80 flex items-center justify-center"
+                >
+                  {loading ? (
+                    <div className="text-center text-gray-500">
+                      Loading chart...
                     </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      CO₂ Emissions
-                    </CardTitle>
-                    <Leaf className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {metrics
-                        .reduce((sum, m) => sum + (m.co2_emissions || 0), 0)
-                        .toFixed(9)}{" "}
-                      g
+                  ) : metrics.length === 0 ? (
+                    <div className="text-center text-gray-500">
+                      No data available
                     </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Water Usage
-                    </CardTitle>
-                    <Droplets className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {metrics
-                        .reduce((sum, m) => sum + (m.water_usage || 0), 0)
-                        .toFixed(9)}{" "}
-                      mL
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Energy Consumption by Project</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div
+                  ref={barChartRef}
+                  className="w-full h-80 flex items-center justify-center"
+                >
+                  {loading ? (
+                    <div className="text-center text-gray-500">
+                      Loading chart...
                     </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Total Sessions
-                    </CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{metrics.length}</div>
-                  </CardContent>
-                </Card>
-              </div>
+                  ) : metrics.length === 0 ? (
+                    <div className="text-center text-gray-500">
+                      No data available
+                    </div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Energy Consumption Trends</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div ref={energyChartRef} className="w-full h-80"></div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Project Comparison</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div ref={comparisonChartRef} className="w-full h-80"></div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Environmental Impact Trends</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    ref={environmentalChartRef}
-                    className="w-full h-80"
-                  ></div>
-                </CardContent>
-              </Card>
-
-              {/* Recent Training Sessions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Training Sessions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {currentSessions.map((metric) => (
-                      <div
-                        key={metric.id}
-                        className="p-4 border rounded-lg hover:bg-muted/50 transition-colors relative group"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold">{metric.project}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(metric.timestamp).toLocaleString()}
-                            </p>
-                          </div>
-                          <Badge variant="outline">{metric.environment}</Badge>
-                        </div>
-
-                        {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-card border rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="font-medium">Energy:</span>
-                              <span>
-                                {(metric.energy_consumption || 0).toFixed(9)}{" "}
-                                kWh
-                              </span>
+          {/* Recent Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Training Sessions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">Loading metrics...</div>
+              ) : metrics.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No metrics found. Start tracking your AI training sessions!
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {currentSessions.map((metric) => (
+                    <div
+                      key={metric.id}
+                      className="relative flex items-center justify-between p-4 border rounded-lg group"
+                    >
+                      {/* Hover Card */}
+                      <div className="absolute -top-2 -left-2 bg-card border border-border rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 p-4 shadow-xl min-w-[300px]">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-lg text-foreground">
+                            {metric.project}
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(metric.timestamp).toLocaleDateString()} at{" "}
+                            {new Date(metric.timestamp).toLocaleTimeString()}
+                          </p>
+                          <div className="grid grid-cols-2 gap-4 mt-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Energy Consumed
+                              </p>
+                              <p className="font-mono text-sm text-foreground">
+                                {metric.energy_consumed.toFixed(9)} kWh
+                              </p>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium">CO₂:</span>
-                              <span>
-                                {(metric.co2_emissions || 0).toFixed(9)} g
-                              </span>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                CO₂ Emissions
+                              </p>
+                              <p className="font-mono text-sm text-foreground">
+                                {metric.emissions.toFixed(9)} g
+                              </p>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium">Water:</span>
-                              <span>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Duration
+                              </p>
+                              <p className="font-mono text-sm text-foreground">
+                                {metric.duration.toFixed(9)} seconds
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">
+                                Water Usage
+                              </p>
+                              <p className="font-mono text-sm text-foreground">
                                 {(metric.water_usage || 0).toFixed(9)} mL
-                              </span>
+                              </p>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium">Duration:</span>
-                              <span>{metric.duration} seconds</span>
-                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Environment
+                            </p>
+                            <p className="font-mono text-sm text-foreground">
+                              {metric.environment}
+                            </p>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <h3 className="font-medium">{metric.project}</h3>
+                          <p className="text-sm text-gray-500">
+                            {new Date(metric.timestamp).toLocaleDateString()} at{" "}
+                            {new Date(metric.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{metric.environment}</Badge>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">
+                          {metric.energy_consumed.toFixed(2)} kWh
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {metric.emissions.toFixed(2)} g CO₂
+                        </div>
+                        {metric.water_usage && (
+                          <div className="text-sm text-blue-500">
+                            {metric.water_usage.toFixed(2)} mL water
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
 
-                  {/* Pagination */}
+                  {/* Pagination Controls */}
                   {totalPages > 1 && (
-                    <div className="flex justify-center space-x-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCurrentPage(Math.max(1, currentPage - 1))
-                        }
-                        disabled={currentPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <span className="flex items-center px-3">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCurrentPage(Math.min(totalPages, currentPage + 1))
-                        }
-                        disabled={currentPage === totalPages}
-                      >
-                        Next
-                      </Button>
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {startIndex + 1}-
+                        {Math.min(endIndex, metrics.length)} of {metrics.length}{" "}
+                        sessions
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, currentPage - 1))
+                          }
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center space-x-1">
+                          {Array.from(
+                            { length: totalPages },
+                            (_, i) => i + 1
+                          ).map((page) => (
+                            <Button
+                              key={page}
+                              variant={
+                                currentPage === page ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          ))}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </main>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* User Management Modal */}
-        {showUserManagement && (
-          <Modal
-            isOpen={showUserManagement}
-            onClose={() => setShowUserManagement(false)}
-            title="Manage Users"
-          >
-            <UserManagement />
-          </Modal>
-        )}
+        <Modal
+          isOpen={showUserManagement}
+          onClose={() => setShowUserManagement(false)}
+          title="User Management"
+        >
+          <UserManagement />
+        </Modal>
       </div>
     </ProtectedRoute>
   );

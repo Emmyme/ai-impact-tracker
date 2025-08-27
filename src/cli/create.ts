@@ -140,12 +140,11 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     await fs.ensureDir(path.join(projectPath, dir));
   }
 
-  // Find templates directory - try multiple possible locations
+  // Find templates directory
   let templateDir = '';
   
   console.log(`Current working directory: ${process.cwd()}`);
   
-  // Try current working directory first
   const cwdTemplates = path.join(process.cwd(), 'templates');
   console.log(`Checking CWD templates: ${cwdTemplates}`);
   if (await fs.pathExists(cwdTemplates)) {
@@ -154,20 +153,17 @@ async function createProjectStructure(projectPath: string, config: any): Promise
   } else {
     console.log(`Templates not found in CWD`);
     
-    // Try relative to the CLI tool's location
     const currentFileUrl = new URL(import.meta.url);
     const currentFilePath = currentFileUrl.pathname;
     const cliDir = path.dirname(currentFilePath);
     console.log(`CLI directory: ${cliDir}`);
     
-    // Convert Unix-style path to Windows path if needed
     let normalizedCliDir = cliDir;
     if (cliDir.startsWith('/')) {
       normalizedCliDir = cliDir.substring(1).replace(/\//g, '\\');
     }
     console.log(`Normalized CLI directory: ${normalizedCliDir}`);
     
-    // Try different relative paths
     const possiblePaths = [
       path.join(normalizedCliDir, '..', 'templates'), // For global install: dist/../templates
       path.join(normalizedCliDir, '..', '..', 'templates'), // For local development: dist/cli/../../templates
@@ -177,7 +173,6 @@ async function createProjectStructure(projectPath: string, config: any): Promise
       path.join(process.cwd(), '..', '..', 'templates')
     ];
     
-    console.log('Checking possible paths:');
     for (const possiblePath of possiblePaths) {
       console.log(`  ${possiblePath} - exists: ${await fs.pathExists(possiblePath)}`);
       if (await fs.pathExists(possiblePath)) {
@@ -196,11 +191,16 @@ async function createProjectStructure(projectPath: string, config: any): Promise
   console.log(`Template directory exists: ${await fs.pathExists(templateDir)}`);
 
   const backendTemplates = [
+    { src: 'backend_backend_init.py', dest: 'backend/__init__.py' },
     { src: 'backend_main.py', dest: 'backend/main.py' },
+    { src: 'backend_core_init.py', dest: 'backend/core/__init__.py' },
     { src: 'backend_core_config.py', dest: 'backend/core/config.py' },
+    { src: 'backend_core_database_init.py', dest: 'backend/core/database/__init__.py' },
     { src: 'backend_core_database_database.py', dest: 'backend/core/database/database.py' },
     { src: 'backend_core_database_models.py', dest: 'backend/core/database/models.py' },
     { src: 'backend_core_security.py', dest: 'backend/core/security.py' },
+    { src: 'backend_api_init.py', dest: 'backend/api/__init__.py' },
+    { src: 'backend_api_models_init.py', dest: 'backend/api/models/__init__.py' },
     { src: 'backend_api_models_user.py', dest: 'backend/api/models/user.py' },
     { src: 'backend_api_models_metric.py', dest: 'backend/api/models/metric.py' },
     { src: 'backend_api_routes_init.py', dest: 'backend/api/routes/__init__.py' },
@@ -217,8 +217,15 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     const srcPath = path.join(templateDir, template.src);
     const destPath = path.join(projectPath, template.dest);
     
+    console.log(`Checking template: ${template.src} -> ${template.dest}`);
+    console.log(`Source path: ${srcPath}`);
+    console.log(`Source exists: ${await fs.pathExists(srcPath)}`);
+    
     if (await fs.pathExists(srcPath)) {
       await fs.copy(srcPath, destPath);
+      console.log(`Copied: ${template.src} -> ${template.dest}`);
+    } else {
+      console.log(`Missing template: ${template.src}`);
     }
   }
 
@@ -238,6 +245,7 @@ async function createProjectStructure(projectPath: string, config: any): Promise
     { src: 'frontend_components_auth_user_management.tsx', dest: 'frontend/src/components/auth/user-management.tsx' },
     { src: 'frontend_contexts_auth_context.tsx', dest: 'frontend/src/contexts/auth-context.tsx' },
     { src: 'frontend_config_auth.ts', dest: 'frontend/src/config/auth.ts' },
+    { src: 'frontend_config_api.ts', dest: 'frontend/src/config/api.ts' },
     { src: 'frontend_components_ui_button.tsx', dest: 'frontend/src/components/ui/button.tsx' },
     { src: 'frontend_components_ui_card.tsx', dest: 'frontend/src/components/ui/card.tsx' },
     { src: 'frontend_components_ui_input.tsx', dest: 'frontend/src/components/ui/input.tsx' },
@@ -310,21 +318,21 @@ async function createAdditionalFiles(projectPath: string, config: any): Promise<
     name: config.name,
     version: '1.0.0',
     description: config.description,
-    scripts: {
-      'dev:backend': 'uvicorn backend.main:app --reload --port 8000',
-      'dev:frontend': 'cd frontend && npm run dev',
-      'dev': 'concurrently "npm run dev:backend" "npm run dev:frontend"',
-      'build:frontend': 'cd frontend && npm run build',
-      'start:backend': 'uvicorn backend.main:app --host 0.0.0.0 --port 8000',
-      'start:frontend': 'cd frontend && npm start',
-      'db:init-users': 'python backend/init_users.py',
-      'test:backend': 'pytest',
-      'test:frontend': 'cd frontend && npm test',
-      'lint:backend': 'black backend && flake8 backend',
-      'lint:frontend': 'cd frontend && npm run lint',
-      'format:backend': 'black backend',
-      'format:frontend': 'cd frontend && npm run format'
-    },
+         scripts: {
+       'dev:backend': 'cd backend && uvicorn main:app --reload --port 8000',
+       'dev:frontend': 'cd frontend && npm run dev',
+       'dev': 'concurrently "npm run dev:backend" "npm run dev:frontend"',
+       'build:frontend': 'cd frontend && npm run build',
+       'start:backend': 'cd backend && uvicorn main:app --host 0.0.0.0 --port 8000',
+       'start:frontend': 'cd frontend && npm start',
+       'db:init-users': 'python backend/init_users.py',
+       'test:backend': 'pytest',
+       'test:frontend': 'cd frontend && npm test',
+       'lint:backend': 'black backend && flake8 backend',
+       'lint:frontend': 'cd frontend && npm run lint',
+       'format:backend': 'black backend',
+       'format:frontend': 'cd frontend && npm run format'
+     },
     devDependencies: {
       concurrently: '^8.2.2'
     }
@@ -333,9 +341,7 @@ async function createAdditionalFiles(projectPath: string, config: any): Promise<
 
   const nextConfigContent = `/** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
+    // App directory is now stable.
 }
 
 module.exports = nextConfig
@@ -392,89 +398,147 @@ ${config.features.map((feature: string) => `- ${feature}`).join('\n')}
 
 ## Quick Start
 
-1. Install Python dependencies:
+### Prerequisites
+
+- Node.js 18+
+- Python 3.8+
+- Docker (optional)
+
+### Installation
+
+1. **Install dependencies:**
+
    \`\`\`bash
+   # Install root dependencies (includes concurrently for running both services)
+   npm install
+
+   # Install Python dependencies
    pip install -r requirements.txt
    \`\`\`
 
-2. Install Node.js dependencies:
-   \`\`\`bash
-   npm install
-   cd frontend && npm install
-   \`\`\`
+2. **Configure environment:**
 
-3. Copy environment file:
    \`\`\`bash
+   # Copy example environment file
    cp .env.example .env
    \`\`\`
 
-4. Initialize the database and create default users:
-   \`\`\`bash
-   npm run db:init-users
+3. **Update configuration:**
+
+   \`\`\`env
+   # .env (root directory)
+   DATABASE_URL=sqlite:///./data/sustainability.db
+   SECRET_KEY=your-secret-key-here
+   DASHBOARD_USERNAME=your-admin-username
+   DASHBOARD_PASSWORD=your-admin-password
+   NEXT_PUBLIC_API_URL=http://localhost:8000
    \`\`\`
 
-5. Start the development servers:
-   \`\`\`bash
-   npm run dev
-   \`\`\`
+### Running the Application
 
-6. Access the dashboard at http://localhost:3000
-
-## Default Users
-
-After running \`npm run db:init-users\`, you can log in with:
-
-- **Admin**: username=\`admin\`, password=\`admin123\`
-- **Developer**: username=\`developer\`, password=\`dev123\`
-- **Manager**: username=\`manager\`, password=\`manager123\`
-
-## Track AI Workloads
+**Option 1: Run from project root (recommended):**
 
 \`\`\`bash
-# Track a Python AI script
-ai-dashboard run python train_model.py
+# Start both frontend and backend
+npm run dev
 
-# Track with project and team
-ai-dashboard run --project "image-classification" --team "ml-team" python train_model.py
-\`\`\`
-
-## Architecture
-
-- **Backend**: Python FastAPI with SQLAlchemy and JWT authentication
-- **Database**: ${config.database} (SQLite/PostgreSQL/MySQL)
-- **Frontend**: Next.js 14 with React, TypeScript, and Tailwind CSS
-- **AI Tracking**: CodeCarbon and CarbonTracker libraries
-- **Authentication**: JWT-based with role-based access control
-- **UI Components**: shadcn/ui with dark mode support
-- **Charts**: D3.js for interactive data visualization
-
-## API Endpoints
-
-- \`POST /api/auth/login\` - User authentication
-- \`POST /api/auth/register\` - User registration (admin/developer only)
-- \`GET /api/metrics\` - Get sustainability metrics
-- \`POST /api/metrics\` - Add new metrics
-- \`GET /api/auth/me\` - Get current user info
-
-## Development
-
-\`\`\`bash
-# Backend development
-npm run dev:backend
-
-# Frontend development
+# Or start them separately
 npm run dev:frontend
-
-# Run tests
-npm run test:backend
-npm run test:frontend
-
-# Format code
-npm run format:backend
-npm run format:frontend
+npm run dev:backend
 \`\`\`
 
-For more information, see the [main documentation](https://github.com/your-username/ai-sustainability-dashboard).
+**Option 2: Run from individual directories:**
+
+\`\`\`bash
+# Backend
+cd backend
+uvicorn main:app --reload --port 8000
+
+# Frontend (in another terminal)
+cd frontend
+npm run dev
+\`\`\`
+
+**Access the dashboard:**
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+## 📊 Features
+
+- **Real-time tracking** of AI training environmental impact
+- **Energy consumption** monitoring
+- **CO2 emissions** calculation
+- **Water usage** estimation
+- **Project comparison** and analytics
+- **User management** with role-based access
+- **Dark mode** support
+- **Export capabilities**
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable              | Description                | Default                              |
+| --------------------- | -------------------------- | ------------------------------------ |
+| \`DATABASE_URL\`        | Database connection string | \`sqlite:///./data/sustainability.db\` |
+| \`SECRET_KEY\`          | JWT secret key             | \`your-secret-key-here\`               |
+| \`DASHBOARD_USERNAME\`  | Admin username             | \`(set in .env)\`                      |
+| \`DASHBOARD_PASSWORD\`  | Admin password             | \`(set in .env)\`                      |
+| \`NEXT_PUBLIC_API_URL\` | Backend API URL            | \`http://localhost:8000\`              |
+
+### Database
+
+- **SQLite** (default): Uses local file-based database
+- Database file: \`./data/sustainability.db\`
+
+## 🐳 Docker Deployment
+
+\`\`\`bash
+# Build and run with Docker Compose
+docker-compose up --build
+
+# Or run in background
+docker-compose up -d
+
+# Stop containers
+docker-compose down
+\`\`\`
+
+**Access the application:**
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+**Note:** The Docker setup uses SQLite
+
+## 📈 API Endpoints
+
+### Authentication
+
+- \`POST /api/auth/login\` - User login
+- \`POST /api/auth/register\` - User registration
+- \`GET /api/auth/me\` - Get current user
+
+### Metrics
+
+- \`GET /api/metrics\` - Get all metrics
+- \`POST /api/metrics\` - Create new metric
+
+## 🔒 Security
+
+- JWT-based authentication
+- Role-based access control
+- Environment variable configuration
+- Input validation and sanitization
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+**Built with ❤️ for a sustainable AI future**
 `;
   await fs.writeFile(path.join(projectPath, 'README.md'), readmeContent);
 }
@@ -500,22 +564,23 @@ async function setupDatabase(projectPath: string, config: any): Promise<void> {
 }
 
 function showNextSteps(projectName: string, config: any): void {
-  console.log('\n🎉 Next steps:');
+  console.log('\nAI Sustainability Dashboard created successfully!');
+  console.log('\nNext steps:');
   console.log(`1. Navigate to your project:`);
   console.log(`   cd ${projectName}`);
   console.log(`2. Copy the environment file:`);
   console.log(`   cp .env.example .env`);
-  console.log(`3. Initialize the database and create default users:`);
-  console.log(`   npm run db:init-users`);
-  console.log(`4. Start the dashboard:`);
+  console.log(`3. Update your credentials in .env:`);
+  console.log(`   DASHBOARD_USERNAME=your-username`);
+  console.log(`   DASHBOARD_PASSWORD=your-password`);
+  console.log(`4. Install dependencies:`);
+  console.log(`   npm install`);
+  console.log(`   pip install -r requirements.txt`);
+  console.log(`5. Start the dashboard:`);
   console.log(`   npm run dev`);
-  console.log(`5. Access the dashboard at:`);
+  console.log(`6. Access the dashboard at:`);
   console.log(`   http://localhost:${config.port}`);
-  console.log(`6. Log in with default credentials:`);
-  console.log(`   Admin: admin / admin123`);
-  console.log(`   Developer: developer / dev123`);
-  console.log(`   Manager: manager / manager123`);
   console.log(`7. Start tracking your AI workloads:`);
-  console.log(`   ai-dashboard run python your_ai_script.py`);
-  console.log('\nHappy sustainable AI development! 🌱');
+  console.log(`   ai-impact-tracker python your_ai_script.py`);
+  console.log('\nHappy development!');
 }

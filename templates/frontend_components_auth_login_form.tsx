@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/auth-context";
 
 interface LoginFormProps {
   onLogin: (username: string, password: string) => Promise<void>;
@@ -81,15 +80,6 @@ export function LoginForm({ onLogin, loading }: LoginFormProps) {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">Default Users:</h4>
-            <div className="text-sm space-y-1">
-              <div>Admin: admin / admin123</div>
-              <div>Developer: developer / dev123</div>
-              <div>Manager: manager / manager123</div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

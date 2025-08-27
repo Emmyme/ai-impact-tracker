@@ -1,12 +1,19 @@
-# Core FastAPI dependencies
+# AI Sustainability Dashboard Backend
+# Core dependencies
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
+pydantic-settings
 python-dotenv
 
 # Database
 sqlalchemy
 alembic
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator
 
 # AI Sustainability Tracking
 codecarbon
@@ -18,10 +25,6 @@ GPUtil
 requests
 python-multipart
 loguru
-
-# Authentication
-python-jose[cryptography]
-passlib[bcrypt]
 
 # Development
 pytest

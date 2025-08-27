@@ -1,73 +1,122 @@
 # AI Sustainability Dashboard - Environment Configuration
+
 # Copy this file to .env and modify as needed
 
 # =============================================================================
+
 # DATABASE CONFIGURATION
+
 # =============================================================================
 
 # Database URL (SQLite by default)
+
 DATABASE_URL=sqlite:///./data/sustainability.db
 
 # Database type (sqlite, postgresql, mysql)
+
 DATABASE_TYPE=sqlite
 
-# PostgreSQL Configuration (if using PostgreSQL)
-# POSTGRES_HOST=localhost
-# POSTGRES_PORT=5432
-# POSTGRES_DB=sustainability
-# POSTGRES_USER=your_username
-# POSTGRES_PASSWORD=your_password
-
-# MySQL Configuration (if using MySQL)
-# MYSQL_HOST=localhost
-# MYSQL_PORT=3306
-# MYSQL_DB=sustainability
-# MYSQL_USER=your_username
-# MYSQL_PASSWORD=your_password
-
 # =============================================================================
+
 # SERVER CONFIGURATION
+
 # =============================================================================
 
 # Backend server port
+
 BACKEND_PORT=8000
 
 # Backend server host
+
 BACKEND_HOST=0.0.0.0
 
 # Environment (development, production, testing)
+
 ENVIRONMENT=development
 
 # =============================================================================
+
 # AUTHENTICATION & SECURITY
+
 # =============================================================================
 
 # Secret key for JWT token signing (CHANGE THIS IN PRODUCTION!)
+
 SECRET_KEY=your-secret-key-here-change-in-production
 
 # JWT algorithm
+
 ALGORITHM=HS256
 
 # JWT token expiration time in minutes
+
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# =============================================================================
-# ENERGY CALCULATION SETTINGS
+# Default admin credentials (used by CLI tool and initial setup)
+
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD=your-password
+
 # =============================================================================
 
-# Energy provider for carbon calculations
-# Options: local, aws, gcp, azure, custom
+# CLI TOOL CONFIGURATION
+
+# =============================================================================
+
+# Dashboard URL for CLI tool to send metrics
+
+DASHBOARD_URL=http://localhost:8000
+
+# =============================================================================
+
+# FRONTEND CONFIGURATION
+
+# =============================================================================
+
+# Backend API URL (used by frontend to communicate with backend)
+
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Authentication token key for storing JWT tokens
+
+NEXT_PUBLIC_AUTH_TOKEN_KEY=ai-impact-tracker-token
+
+# Session timeout in minutes
+
+NEXT_PUBLIC_SESSION_TIMEOUT=30
+
+# Enable debug mode (development only)
+
+NEXT_PUBLIC_DEBUG=true
+
+# Log level (debug, info, warning, error)
+
+NEXT_PUBLIC_LOG_LEVEL=info
+
+# =============================================================================
+
+# ENERGY CALCULATION SETTINGS
+
+# =============================================================================
+
+# Energy provider for carbon calculations (local training only)
+
 ENERGY_PROVIDER=local
 
 # Region for energy calculations
+
 REGION=local
 
 # =============================================================================
+
 # DEVELOPMENT SETTINGS
+
 # =============================================================================
 
 # Enable debug mode (development only)
+
 DEBUG=true
 
 # Log level (debug, info, warning, error)
+
 LOG_LEVEL=info

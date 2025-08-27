@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     energy_provider: str = "local"
     region: str = "local"
     
+    # Development settings
+    debug: bool = False
+    log_level: str = "info"
+    
+    # Authentication & Security
+    secret_key: str = "your-secret-key-here-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
     # PostgreSQL settings
     postgres_host: Optional[str] = None
     postgres_port: Optional[int] = None
@@ -33,5 +42,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 settings = Settings()
