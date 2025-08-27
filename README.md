@@ -16,11 +16,11 @@ ai-impact-tracker python train.py
 
 **That's it!** The tool will:
 
-- ✅ Install required tracking libraries (codecarbon, carbontracker, requests)
-- ✅ Use codecarbon to measure energy consumption and CO2 emissions
-- ✅ Calculate water usage estimates from energy data
-- ✅ Display metrics in the terminal
-- ✅ Store data in your dashboard database
+- Install required tracking libraries (codecarbon, carbontracker, requests)
+- Use codecarbon to measure energy consumption and CO2 emissions
+- Calculate water usage estimates from energy data
+- Display metrics in the terminal
+- Store data in your dashboard database
 
 ## Quick Start
 
@@ -63,13 +63,13 @@ ai-impact-tracker --project "ai-finetuning" --team "team1" python train.py
 
 ## Features
 
-### 🚀 Zero Configuration
+### Zero Configuration
 
 - No code changes needed to your existing scripts
 - Automatic dependency installation
 - Interactive prompts for missing options
 
-### 📊 Comprehensive Tracking
+### Comprehensive Tracking
 
 - **Energy consumption** (kWh)
 - **CO2 emissions** (g)
@@ -77,7 +77,7 @@ ai-impact-tracker --project "ai-finetuning" --team "team1" python train.py
 - **Duration** tracking
 - **Project/team/environment** metadata
 
-### 🎯 Smart Integration
+### Smart Integration
 
 - Works with any Python AI training script
 - Supports PyTorch, TensorFlow, HuggingFace, etc.
@@ -85,12 +85,11 @@ ai-impact-tracker --project "ai-finetuning" --team "team1" python train.py
 - Preserves original script behavior
 - **Local training only** (cloud/remote training not supported)
 
-### 📈 Beautiful Dashboard
+### Simple Dashboard
 
 - Modern Next.js + FastAPI stack
 - Real-time metrics visualization
 - Project comparison charts
-- Export capabilities
 - JWT authentication
 
 ### Environment Configuration
@@ -160,6 +159,7 @@ After running your training, view results at `http://localhost:3000`:
 - **[FastAPI](https://fastapi.tiangolo.com/)**
 - **[Commander.js](https://github.com/tj/commander.js)**
 - **[Tailwind CSS](https://tailwindcss.com/)**
+- **[shadcn/ui](https://ui.shadcn.com/)** 
 
 ## License
 
