@@ -80,3 +80,7 @@ out/
 # Debug files
 debug-copy-templates.ts
 
+# Test/development projects
+backend/
+frontend/
+
