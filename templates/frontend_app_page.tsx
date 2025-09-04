@@ -14,7 +14,6 @@ import { getMetricsUrl } from "@/config/api";
 import {
   Leaf,
   Zap,
-  Droplets,
   Clock,
   Users,
   FolderOpen,
@@ -32,7 +31,6 @@ interface Metric {
   duration: number;
   timestamp: string;
   environment: string;
-  water_usage?: number;
 }
 
 export default function Dashboard() {
@@ -133,7 +131,6 @@ export default function Dashboard() {
         session: `Session ${index + 1}`,
         energy: metric.energy_consumed * 1000, // Convert to Wh for better visibility
         emissions: metric.emissions * 1000, // Convert to mg CO2 (since we store in g)
-        water: (metric.water_usage || 0) * 1, // Keep in mL (since we store in mL)
         timestamp: new Date(metric.timestamp),
         project: metric.project,
       }));
@@ -147,7 +144,7 @@ export default function Dashboard() {
 
     // Y scale - use the maximum value across all metrics for better scaling
     const maxValue =
-      d3.max(chartData, (d) => Math.max(d.energy, d.emissions, d.water)) || 0;
+      d3.max(chartData, (d) => Math.max(d.energy, d.emissions)) || 0;
 
     const y = d3.scaleLinear().domain([0, maxValue]).range([height, 0]);
 
@@ -170,25 +167,11 @@ export default function Dashboard() {
         session: string;
         energy: number;
         emissions: number;
-        water: number;
         timestamp: Date;
         project: string;
       }>()
       .x((d) => x(d.session) || 0)
       .y((d) => y(d.emissions))
-      .curve(d3.curveMonotoneX);
-
-    const waterLine = d3
-      .line<{
-        session: string;
-        energy: number;
-        emissions: number;
-        water: number;
-        timestamp: Date;
-        project: string;
-      }>()
-      .x((d) => x(d.session) || 0)
-      .y((d) => y(d.water))
       .curve(d3.curveMonotoneX);
 
     // Add X axis
@@ -231,9 +214,9 @@ export default function Dashboard() {
       .append("path")
       .datum(chartData)
       .attr("fill", "none")
-      .attr("stroke", "#06b6d4")
+      .attr("stroke", "#ef4444")
       .attr("stroke-width", 3)
-      .attr("d", waterLine);
+      .attr("d", emissionsLine);
 
     // Add data points for energy
     svg
@@ -295,36 +278,6 @@ export default function Dashboard() {
         svg.selectAll(".tooltip").remove();
       });
 
-    // Add data points for water
-    svg
-      .selectAll("circle.water")
-      .data(chartData)
-      .enter()
-      .append("circle")
-      .attr("class", "water")
-      .attr("cx", (d) => x(d.session) || 0)
-      .attr("cy", (d) => y(d.water))
-      .attr("r", 4)
-      .attr("fill", "#06b6d4")
-      .attr("opacity", 0.8)
-      .on("mouseover", function (event, d) {
-        d3.select(this).attr("opacity", 1).attr("r", 6);
-        svg
-          .append("text")
-          .attr("class", "tooltip")
-          .attr("x", (x(d.session) || 0) + 10)
-          .attr("y", y(d.water) - 10)
-          .attr("text-anchor", "start")
-          .style("font-size", "12px")
-          .style("font-weight", "bold")
-          .style("fill", "currentColor")
-          .text(`Water: ${d.water.toFixed(1)} mL`);
-      })
-      .on("mouseout", function () {
-        d3.select(this).attr("opacity", 0.8).attr("r", 4);
-        svg.selectAll(".tooltip").remove();
-      });
-
     // Add legend
     const legend = svg.append("g").attr("class", "legend");
 
@@ -363,24 +316,6 @@ export default function Dashboard() {
       .style("font-size", "12px")
       .style("fill", "currentColor")
       .text("CO₂ (mg)");
-
-    // Water legend
-    legend
-      .append("line")
-      .attr("x1", width - 160)
-      .attr("y1", -30)
-      .attr("x2", width - 140)
-      .attr("y2", -30)
-      .attr("stroke", "#06b6d4")
-      .attr("stroke-width", 2);
-
-    legend
-      .append("text")
-      .attr("x", width - 135)
-      .attr("y", -27)
-      .style("font-size", "12px")
-      .style("fill", "currentColor")
-      .text("Water (mL)");
   };
 
   const createProjectComparisonChart = () => {
@@ -481,10 +416,6 @@ export default function Dashboard() {
     (sum, metric) => sum + metric.emissions,
     0
   );
-  const totalWaterUsage = metrics.reduce(
-    (sum, metric) => sum + (metric.water_usage || 0),
-    0
-  );
   const totalDuration = metrics.reduce(
     (sum, metric) => sum + metric.duration,
     0
@@ -551,7 +482,7 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -598,21 +529,6 @@ export default function Dashboard() {
                   {(totalDuration / 3600).toFixed(1)}h
                 </div>
                 <p className="text-xs text-muted-foreground">Training time</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Water Usage
-                </CardTitle>
-                <Droplets className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {totalWaterUsage.toFixed(2)} mL
-                </div>
-                <p className="text-xs text-muted-foreground">Cooling water</p>
               </CardContent>
             </Card>
 
@@ -729,14 +645,6 @@ export default function Dashboard() {
                                 {metric.duration.toFixed(9)} seconds
                               </p>
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                Water Usage
-                              </p>
-                              <p className="font-mono text-sm text-foreground">
-                                {(metric.water_usage || 0).toFixed(9)} mL
-                              </p>
-                            </div>
                           </div>
                           <div className="mt-2">
                             <p className="text-xs text-muted-foreground">
@@ -765,11 +673,6 @@ export default function Dashboard() {
                         <div className="text-sm text-gray-500">
                           {metric.emissions.toFixed(2)} g CO₂
                         </div>
-                        {metric.water_usage && (
-                          <div className="text-sm text-blue-500">
-                            {metric.water_usage.toFixed(2)} mL water
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}

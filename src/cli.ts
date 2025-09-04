@@ -83,7 +83,7 @@ program
       console.log(`Running: ${scriptCommand}`);
       
       // Check and install required Python dependencies
-      console.log('🔧 Checking Python dependencies...');
+      console.log('Checking Python dependencies...');
       try {
         await checkAndInstallDependencies();
       } catch (error) {
@@ -103,22 +103,42 @@ os.environ['AI_DASHBOARD_RUN_ID'] = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 print('Starting environmental tracking...')
 
-# Try to use CodeCarbon if available
+# Initialize both trackers
+energy_consumed = 0.0
+co2_emissions = 0.0
+water_usage = 0.0
+
 try:
     from codecarbon import EmissionsTracker
+    from carbontracker.tracker import CarbonTracker
+    
+    # CodeCarbon
     tracker = EmissionsTracker(
         project_name='${project}',
         save_to_file=True,
         output_file=f'./data/{os.environ["AI_DASHBOARD_RUN_ID"]}_emissions.csv',
         log_level='error'
     )
+    
+    # CarbonTracker
+    carbon_tracker = CarbonTracker(
+        epochs=1,
+        monitor_epochs=1,
+        update_interval=1,
+        log_dir='./data',
+        verbose=2,
+        ignore_errors=True
+    )
+    
     tracker.start()
-    print('CodeCarbon tracking initialized')
-except ImportError:
-    print('CodeCarbon not available - using basic timing')
+    carbon_tracker.epoch_start()
+    print('CodeCarbon and CarbonTracker tracking initialized')
+except ImportError as e:
+    print(f'Tracking libraries not available: {e}')
     tracker = None
+    carbon_tracker = None
 
-# Run the AI script
+# Run the script
 start_time = time.time()
 cmd = ${JSON.stringify(script)}
 print(f'Executing: {" ".join(cmd)}')
@@ -128,21 +148,33 @@ try:
     end_time = time.time()
     duration = end_time - start_time
     
-    # Calculate metrics
+    # Stop tracking and get measurements
+    if carbon_tracker:
+        carbon_tracker.epoch_end()
+    
     if tracker:
         emissions = tracker.stop()
-        energy_consumed = emissions
-        co2_emissions = emissions * 0.5
+        if emissions is not None and isinstance(emissions, (int, float)) and emissions > 0:
+            energy_consumed = float(emissions)
+            co2_emissions = energy_consumed * 0.5  # kg CO2 per kWh (typical grid mix)
+            water_usage = 0.0   # No water usage for local AI training (air cooling)
+            print(f'CodeCarbon measured energy: {energy_consumed:.6f} kWh')
+            print(f'CO2 emissions: {co2_emissions:.6f} kg')
+            print(f'Water usage: {water_usage:.6f} L (local training - no water cooling)')
+        else:
+            print('CodeCarbon returned no valid data - using zeros')
+            energy_consumed = 0.0
+            co2_emissions = 0.0
+            water_usage = 0.0
     else:
-        energy_consumed = duration * 0.1  # Rough estimate
-        co2_emissions = energy_consumed * 0.5
+        print('No tracking available - using zeros')
+        energy_consumed = 0.0
+        co2_emissions = 0.0
+        water_usage = 0.0
     
-    # Calculate water usage (cooling for data centers)
-    water_usage = energy_consumed * 2.0  # Rough estimate: 2L per kWh
-    
-    print(f'Energy consumed: {energy_consumed:.4f} kWh')
-    print(f'CO2 emissions: {co2_emissions:.4f} g')
-    print(f'Water usage: {water_usage:.4f} L')
+    print(f'Energy consumed: {energy_consumed:.6f} kWh')
+    print(f'CO2 emissions: {co2_emissions:.6f} g')
+    print(f'Water usage: {water_usage:.6f} L')
     print(f'Duration: {duration:.2f} seconds')
     
     # Send data to dashboard
@@ -188,8 +220,16 @@ try:
     sys.exit(result.returncode)
     
 except Exception as e:
+    if carbon_tracker:
+        try:
+            carbon_tracker.epoch_end()
+        except:
+            pass
     if tracker:
-        tracker.stop()
+        try:
+            tracker.stop()
+        except:
+            pass
     print(f'Error: {e}')
     sys.exit(1)
 `;

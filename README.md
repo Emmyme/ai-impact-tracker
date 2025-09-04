@@ -1,170 +1,117 @@
 # AI Impact Tracker 🌱
 
-A CLI tool that automatically tracks the environmental impact of your local AI training runs and stores the data in a dashboard.
+A simple CLI tool to track the environmental impact of your AI training runs, with an optional dashboard for visualizing trends and analytics.
 
-## What It Does
+![AI Impact Tracker Dashboard](./assets/image.png)
 
-This CLI tool automatically measures the environmental impact of your local AI training runs. Instead of manually setting up tracking libraries, just wrap your command:
+> **Dashboard Screenshot Note**: The data shown in the dashboard image above is sample/demo data only. 
 
-```bash
-# Before: Just run your training
-python train.py
-
-# After: Automatically track energy, CO2, and water usage
-ai-impact-tracker python train.py
-```
-
-**That's it!** The tool will:
-
-- Install required tracking libraries (codecarbon, carbontracker, requests)
-- Use codecarbon to measure energy consumption and CO2 emissions
-- Calculate water usage estimates from energy data
-- Display metrics in the terminal
-- Store data in your dashboard database
+> **Important**: This tool provides basic environmental impact estimates for awareness and overview purposes only. It is **not intended for regulatory compliance, carbon accounting, or official reporting**. For precise measurements or compliance requirements, please use specialized tools and consult environmental experts.
 
 ## Quick Start
 
-### 1. Install the CLI
-
 ```bash
-# Install directly from GitHub
+# 1. Install
 npm install -g https://github.com/emmyme/ai-impact-tracker
 
-# Or clone and install locally
-git clone https://github.com/emmyme/ai-impact-tracker
-cd ai-impact-tracker
-npm install
-npm run build
-npm install -g .
-```
-
-### 2. Create a Dashboard
-
-```bash
-# Generate a complete dashboard project
-ai-impact-tracker create my-dashboard
-
-# Start it (required for data storage)
-cd my-dashboard
-npm install
-pip install -r requirements.txt
-npm run dev
-```
-
-### 3. Track Your AI Training
-
-```bash
-# Basic usage (will prompt for project/team/environment)
+# 2. Track your training
 ai-impact-tracker python train.py
-
-# With project metadata (skips prompts)
-ai-impact-tracker --project "ai-finetuning" --team "team1" python train.py
 ```
 
-## Features
+That's it! The tool will show you:
+- Energy consumption (kWh)
+- CO2 emissions (grams)
+- Training duration
 
-### Zero Configuration
+For visual analytics and team collaboration, you can also generate a full dashboard (see below).
 
-- No code changes needed to your existing scripts
-- Automatic dependency installation
-- Interactive prompts for missing options
+## Optional Dashboard
 
-### Comprehensive Tracking
-
-- **Energy consumption** (kWh)
-- **CO2 emissions** (g)
-- **Water usage** estimates (L)
-- **Duration** tracking
-- **Project/team/environment** metadata
-
-### Smart Integration
-
-- Works with any Python AI training script
-- Supports PyTorch, TensorFlow, HuggingFace, etc.
-- Real-time output streaming
-- Preserves original script behavior
-- **Local training only** (cloud/remote training not supported)
-
-### Simple Dashboard
-
-- Modern Next.js + FastAPI stack
-- Real-time metrics visualization
-- Project comparison charts
-- JWT authentication
-
-### Environment Configuration
-
-Create a `.env` file:
-
-```env
-DASHBOARD_URL=http://localhost:8000
-DASHBOARD_USERNAME=your-username
-DASHBOARD_PASSWORD=your-password
-```
-
-## CLI Commands
+Want to see charts and trends?
 
 ```bash
-# Main command: Track AI training
-ai-impact-tracker <script> [options]
+# Create a dashboard
+ai-impact-tracker create my-dashboard
+cd my-dashboard && npm install && npm run dev
 
-# Generate dashboard project
-ai-impact-tracker create <project-name>
-
-# Show help
-ai-impact-tracker --help
+# Then track with dashboard storage
+ai-impact-tracker python train.py
 ```
 
-### Options
 
-- `--project <name>` - Project name
+
+### Dashboard Features
+
+- **Visual Analytics**: Interactive charts showing energy and emissions trends over time
+- **Project Comparison**: Compare environmental impact across different AI projects
+- **Session History**: Detailed logs of all training sessions with precise metrics
+- **User Management**: Role-based access control for teams
+- **Dark Mode**: Modern UI with light/dark theme support
+- **Real-time Updates**: Metrics appear automatically as you run training sessions
+
+The dashboard provides a comprehensive view of your AI environmental impact with:
+- Energy consumption trends
+- CO2 emissions over time
+- Project-by-project comparisons
+- Training duration analytics
+- Export capabilities for further analysis
+
+## CLI Options
+
+```bash
+ai-impact-tracker python train.py --project "my-model" --team "research"
+```
+
+- `--project <name>` - Project name for organization
 - `--team <name>` - Team name
 - `--environment <env>` - Environment (development/staging/production)
-- `--dashboard-url <url>` - Dashboard API URL
 
 ## How It Works
 
-1. **Dependency Check** - Automatically installs codecarbon, carbontracker, and requests.
-2. **Process Wrapping** - Wraps your script in a Python environment with tracking
-3. **Environmental Monitoring** - Uses codecarbon to measure energy consumption and CO2 emissions
-4. **Data Processing** - Calculates water usage estimates and formats metrics
-5. **Dashboard Integration** - Sends metrics via HTTP to your dashboard
-6. **Clean Exit** - Preserves your script's original behavior
+1. Wraps your Python script with environmental tracking
+2. Uses CodeCarbon to measure actual energy consumption
+3. Calculates CO2 emissions based on your location's power grid
+4. Shows results in terminal and optionally saves to dashboard
 
-## Dashboard
+## What's Tracked
 
-After running your training, view results at `http://localhost:3000`:
+- **Energy**: Real measurements from your CPU/GPU usage
+- **CO2**: Calculated from energy consumption and grid carbon intensity
+- **Duration**: How long your training took
+- **No Water Usage**: Local machines don't use water for cooling
 
-- 📊 Real-time energy consumption charts
-- 🌱 CO2 emissions tracking
-- 💧 Water usage estimates
-- 📈 Project comparison analytics
-- 👥 Team performance metrics
-- 📤 Export capabilities
+## Limitations & Disclaimers
 
-## Architecture
+- **Good for**: Awareness, comparing models, understanding impact trends
+- **Not for**: Regulatory compliance, official carbon reporting, precise accounting
+- **Local only**: Designed for personal computers, not cloud/datacenter training
+- **Estimates**: Results vary by hardware, location, and grid conditions
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Your Script   │───▶│  AI Impact CLI   │───▶│   Dashboard     │
-│   (train.py)    │    │  (Tracking)      │    │  (Next.js+API)  │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
+## Technical Details
 
-## Acknowledgments
-
-- **[CodeCarbon](https://codecarbon.io/)**
-- **[CarbonTracker](https://carbontracker.info/)**
-- **[Next.js](https://nextjs.org/)**
-- **[FastAPI](https://fastapi.tiangolo.com/)**
-- **[Commander.js](https://github.com/tj/commander.js)**
-- **[Tailwind CSS](https://tailwindcss.com/)**
-- **[shadcn/ui](https://ui.shadcn.com/)** 
+- Uses [CodeCarbon](https://codecarbon.io/) for energy measurement
+- Uses [CarbonTracker](https://carbontracker.info/) for detailed logging
+- Automatically installs required dependencies
+- Works with any Python AI framework (PyTorch, TensorFlow, etc.)
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+## Acknowledgments
+
+This project is built with and depends on these tools:
+
+- **[CodeCarbon](https://codecarbon.io/)** - Energy consumption measurement
+- **[CarbonTracker](https://carbontracker.info/)** - Detailed carbon footprint logging
+- **[Next.js](https://nextjs.org/)** - React framework for the dashboard
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Modern Python web framework
+- **[Commander.js](https://github.com/tj/commander.js/)** - Node.js command-line interfaces
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[shadcn/ui](https://ui.shadcn.com/)** - Beautiful UI components
+- **[D3.js](https://d3js.org/)** - Data visualization library
+
 ---
 
-**Built with ❤️ for a sustainable AI future**
+**Built for AI environmental awareness** 
+
