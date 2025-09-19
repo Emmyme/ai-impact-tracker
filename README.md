@@ -1,6 +1,6 @@
 # AI Impact Tracker 🌱
 
-A simple CLI tool to track the environmental impact of your AI training runs, with an optional dashboard for visualizing trends and analytics.
+A simple CLI tool to track the environmental impact of your local AI training runs, with an optional dashboard for visualizing trends and analytics.
 
 ![AI Impact Tracker Dashboard](./assets/image.png)
 
@@ -54,7 +54,6 @@ The dashboard provides a comprehensive view of your AI environmental impact with
 - CO2 emissions over time
 - Project-by-project comparisons
 - Training duration analytics
-- Export capabilities for further analysis
 
 ## CLI Options
 
@@ -78,7 +77,6 @@ ai-impact-tracker python train.py --project "my-model" --team "research"
 - **Energy**: Real measurements from your CPU/GPU usage
 - **CO2**: Calculated from energy consumption and grid carbon intensity
 - **Duration**: How long your training took
-- **No Water Usage**: Local machines don't use water for cooling
 
 ## Limitations & Disclaimers
 
